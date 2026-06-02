@@ -1,0 +1,4146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ONE PIECE BOUNTY RUSH - Arena & Scout -</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background-color: #030611;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+        }
+        .cinzel {
+            font-family: 'Cinzel', serif;
+        }
+        /* 発光・オーラエフェクト */
+        .glow-blue {
+            text-shadow: 0 0 10px rgba(59, 130, 246, 0.8), 0 0 20px rgba(59, 130, 246, 0.4);
+        }
+        .glow-red {
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(239, 68, 68, 0.4);
+        }
+        .glow-gold {
+            text-shadow: 0 0 10px rgba(245, 158, 11, 0.8), 0 0 20px rgba(245, 158, 11, 0.4);
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+        }
+        /* チームブーストオーラ */
+        @keyframes boost-border-pulse {
+            0%, 100% { box-shadow: inset 0 0 25px rgba(245, 158, 11, 0.45); border: 4px solid rgba(245, 158, 11, 0.4); }
+            50% { box-shadow: inset 0 0 50px rgba(245, 158, 11, 0.85); border: 4px solid rgba(245, 158, 11, 0.8); }
+        }
+        .boost-active-blue {
+            animation: boost-border-pulse 1s infinite alternate;
+            box-shadow: inset 0 0 35px rgba(59, 130, 246, 0.6) !important;
+            border: 4px solid rgba(59, 130, 246, 0.6) !important;
+        }
+        .boost-active-red {
+            animation: boost-border-pulse 1s infinite alternate;
+            box-shadow: inset 0 0 35px rgba(239, 68, 68, 0.6) !important;
+            border: 4px solid rgba(239, 68, 68, 0.6) !important;
+        }
+        /* スキャンライン効果 */
+        .scanlines {
+            position: relative;
+            overflow: hidden;
+        }
+        .scanlines::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 255, 0, 0.03));
+            z-index: 2;
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+        }
+        /* キャラクターカードアニメーション */
+        .wanted-card {
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease, border-color 0.3s;
+            position: relative;
+        }
+        .wanted-card:hover {
+            transform: scale(1.04) translateY(-4px);
+            box-shadow: 0 15px 30px -5px rgba(245, 158, 11, 0.35);
+        }
+        /* 超フェス（EXTREME）限定：虹色脈動グラデーション枠 */
+        @keyframes rainbow-border {
+            0% { border-color: #ef4444; box-shadow: 0 0 12px rgba(239, 68, 68, 0.6); }
+            20% { border-color: #3b82f6; box-shadow: 0 0 12px rgba(59, 130, 246, 0.6); }
+            40% { border-color: #10b981; box-shadow: 0 0 12px rgba(16, 185, 129, 0.6); }
+            60% { border-color: #f59e0b; box-shadow: 0 0 12px rgba(245, 158, 11, 0.6); }
+            80% { border-color: #ec4899; box-shadow: 0 0 12px rgba(236, 72, 153, 0.6); }
+            100% { border-color: #ef4444; box-shadow: 0 0 12px rgba(239, 68, 68, 0.6); }
+        }
+        .ext-rainbow {
+            animation: rainbow-border 3.5s infinite linear;
+        }
+        #joystick-container {
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        @keyframes flag-spin {
+            0% { transform: scale(0.8) rotate(0deg); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: scale(1.3) rotate(360deg); opacity: 0; }
+        }
+        .flag-flash {
+            animation: flag-spin 1.8s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative text-white antialiased scanlines">
+
+    <!-- チームブースト発動時の画面発光枠 -->
+    <div id="boost-overlay" class="absolute inset-0 pointer-events-none z-35 transition-all duration-300"></div>
+
+    <!-- 音声有効化モーダル（スタートボタン） -->
+    <div id="audio-modal" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-950 bg-opacity-95 p-6 text-center">
+        <div class="max-w-md bg-slate-900 border-2 border-amber-500 rounded-2xl p-8 shadow-2xl glow-gold">
+            <h1 class="cinzel text-4xl text-amber-500 font-black mb-4 tracking-wider">BOUNTY RUSH</h1>
+            <p class="text-gray-300 mb-6 leading-relaxed text-sm">
+                海賊たちの誇りを賭けた 4vs4 旗奪いアリーナバトル！<br>
+                新イベント：超フェス「太陽の神 ニカ」「海賊王 ロジャー」「黒髭」降臨！<br>
+                画面をタップしてサウンドを有効にしてください。
+            </p>
+            <button id="btn-enable-audio" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-lg py-4 px-8 rounded-xl shadow-lg transform hover:scale-105 active:scale-95 transition duration-200">
+                <i class="fa-solid fa-volume-high mr-2 animate-bounce"></i> サウンドを有効にして開始！
+            </button>
+        </div>
+    </div>
+
+    <!-- メインメニュー画面 -->
+    <div id="menu-screen" class="hidden absolute inset-0 z-40 flex flex-col items-center justify-between bg-cover bg-center p-6" style="background-image: linear-gradient(rgba(11, 15, 25, 0.88), rgba(11, 15, 25, 0.98)), url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80');">
+        <!-- ヘッダー -->
+        <div class="w-full flex justify-between items-center max-w-6xl mt-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-12 h-12 bg-amber-500 rounded-lg flex items-center justify-center font-black text-slate-950 text-2xl shadow-lg shadow-amber-500/20">BR</div>
+                <div>
+                    <h2 class="font-black text-xl tracking-wider text-amber-500 cinzel">GRAND LINE</h2>
+                    <p class="text-xs text-gray-400">ARENA CHAMPIONSHIP</p>
+                </div>
+            </div>
+            
+            <!-- ダイヤ所持数インジケーター -->
+            <div class="flex items-center space-x-6">
+                <div class="bg-slate-900 border border-amber-500/30 px-4 py-2 rounded-xl flex items-center space-x-2 shadow-inner">
+                    <span class="text-amber-400 text-base">💎</span>
+                    <span id="menu-diamonds" class="font-black text-lg text-amber-300 font-mono">150</span>
+                    <span class="text-[10px] text-gray-500 font-bold">ダイヤ</span>
+                </div>
+                <button onclick="toggleHowTo(true)" class="bg-slate-800 hover:bg-slate-700 text-amber-500 font-bold px-4 py-2 rounded-lg border border-amber-500/30 transition text-sm">
+                    <i class="fa-solid fa-circle-question mr-1"></i> ルール
+                </button>
+            </div>
+        </div>
+
+        <!-- センタータイトル -->
+        <div class="text-center my-auto flex flex-col items-center">
+            <div class="inline-block bg-amber-500/10 border border-amber-500/30 px-4 py-1.5 rounded-full text-xs text-amber-400 font-semibold mb-3 tracking-widest uppercase">
+                4vs4 TEAM FLAG BATTLE
+            </div>
+            <h1 class="cinzel text-5xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-200 to-amber-500 tracking-wider mb-2 drop-shadow-lg">
+                BOUNTY RUSH
+            </h1>
+            <p class="text-sm md:text-lg text-gray-300 font-medium tracking-wide max-w-xl mx-auto mb-10">
+                お宝を奪い合い、新時代を切り開け！<br>
+                最初は「ルフィ」のみ使用可能！ガシャで「ロジャー」や「ギア5ニカ」「黒髭」を獲得し、バトルを圧倒しよう！
+            </p>
+            
+            <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-6">
+                <button id="btn-to-char-select" class="bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xl py-5 px-14 rounded-full shadow-2xl shadow-amber-500/30 transform hover:scale-105 active:scale-95 transition-all duration-300 tracking-widest">
+                    バトル開始！ <i class="fa-solid fa-skull-crossbones ml-2"></i>
+                </button>
+                <button id="btn-to-gasha" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xl py-5 px-12 rounded-full shadow-2xl shadow-indigo-500/30 transform hover:scale-105 active:scale-95 transition-all duration-300 tracking-widest flex items-center justify-center space-x-2">
+                    <span>ガシャを引く 💎</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- フッター -->
+        <div class="text-gray-500 text-xs text-center pb-2">
+            © 2026 PIRATES ARENA. EXTREME BOUNTY SCOUT ACTIVE.
+        </div>
+    </div>
+
+    <!-- キャラクター選択画面 -->
+    <div id="char-screen" class="hidden absolute inset-0 z-40 bg-slate-950 flex flex-col p-6 overflow-y-auto">
+        <div class="max-w-6xl w-full mx-auto flex flex-col h-full justify-between space-y-6">
+            <!-- 戻るボタン & タイトル -->
+            <div class="flex items-center justify-between">
+                <button id="btn-back-to-menu-from-char" class="text-gray-400 hover:text-white transition flex items-center space-x-2 text-sm">
+                    <i class="fa-solid fa-arrow-left"></i> <span>メニューへ戻る</span>
+                </button>
+                <h2 class="cinzel text-2xl font-black text-amber-500 tracking-wider">SELECT YOUR PIRATE</h2>
+                
+                <!-- ダイヤ所持数表示 -->
+                <div class="bg-slate-900 border border-amber-500/20 px-3 py-1.5 rounded-xl flex items-center space-x-1.5 text-xs">
+                    <span class="text-amber-400">💎</span>
+                    <span id="char-diamonds" class="font-black text-amber-300 font-mono">150</span>
+                </div>
+            </div>
+
+            <!-- キャラクターリスト -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 my-auto overflow-y-auto max-h-[70vh] p-1" id="character-list-grid">
+                <!-- 動的にキャラクターカードが生成されます (ロック状態付き) -->
+            </div>
+
+            <div class="text-center text-xs text-slate-500">
+                <p class="max-w-md mx-auto">「ルフィ」以外はガシャで獲得するとロックが解除されます。ガシャメニューから虹のダイヤを消費して引いてみましょう！</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ガシャ（スカウト）画面 -->
+    <div id="gasha-screen" class="hidden absolute inset-0 z-40 bg-slate-950 flex flex-col p-6 overflow-y-auto" style="background-image: linear-gradient(rgba(15, 23, 42, 0.95), rgba(3, 7, 18, 0.99)), url('https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=1200&q=80'); background-size: cover; background-position: center;">
+        <div class="max-w-4xl w-full mx-auto flex flex-col h-full justify-between space-y-6">
+            <!-- ヘッダー -->
+            <div class="flex items-center justify-between">
+                <button id="btn-back-to-menu-from-gasha" class="text-gray-400 hover:text-white transition flex items-center space-x-2 text-sm">
+                    <i class="fa-solid fa-arrow-left"></i> <span>メニューへ戻る</span>
+                </button>
+                <h2 class="cinzel text-2xl font-black text-purple-400 tracking-widest uppercase">PIRATES SCOUT</h2>
+                <div class="flex items-center space-x-3">
+                    <button id="btn-free-diamonds" class="bg-emerald-600/30 hover:bg-emerald-600 text-emerald-400 hover:text-white text-[10px] font-black px-3 py-1.5 rounded-lg border border-emerald-500/30 transition">
+                        💎 ダイヤ無料チャージ (+100)
+                    </button>
+                    <div class="bg-slate-900 border border-purple-500/30 px-3 py-1.5 rounded-xl flex items-center space-x-1.5 text-xs">
+                        <span class="text-amber-400">💎</span>
+                        <span id="gasha-diamonds" class="font-black text-amber-300 font-mono">150</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- バナーポスター -->
+            <div class="bg-gradient-to-r from-purple-950/60 via-indigo-950/80 to-purple-950/60 border border-purple-500/30 rounded-2xl p-6 shadow-2xl flex flex-col md:flex-row items-center justify-between relative overflow-hidden">
+                <div class="absolute inset-0 bg-radial-gradient(ellipse at center, rgba(147, 51, 234, 0.1) 0%, transparent 80%) pointer-events-none"></div>
+                <div class="mb-6 md:mb-0 max-w-lg z-10">
+                    <span class="bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">超フェス開催中！</span>
+                    <h1 class="cinzel text-3xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-yellow-200 to-amber-400 mt-2 tracking-wider">
+                        伝説の強者 降臨
+                    </h1>
+                    <p class="text-gray-300 text-sm mt-3 leading-relaxed">
+                        「ギア5 ルフィ」、「海賊王 ロジャー」、「四皇 黒髭」が超フェスとして参戦！<br>
+                        星4キャラ（ゾロ、シャンクス、ロー等）もピックアップ。ダイヤを消費して最強の海賊を仲間に加えましょう！
+                    </p>
+                    <div class="flex items-center space-x-4 mt-4 text-xs font-bold text-amber-400">
+                        <span>⭐ 超フェス出現率: 6.5%!!</span>
+                        <span>⭐ 仲間を増やしてアリーナを支配せよ!</span>
+                    </div>
+                </div>
+
+                <!-- ギア5 ニカビジュアルデコレーション -->
+                <div class="w-32 h-32 md:w-40 md:h-40 bg-slate-950/80 rounded-2xl border-2 border-yellow-400/50 flex items-center justify-center p-3 relative overflow-hidden glow-gold transform rotate-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-full h-full">
+                        <circle cx="50" cy="45" r="25" fill="#fbcfe8" />
+                        <path d="M22,35 C10,25 20,5 38,10 C45,2 55,2 62,10 C80,5 90,25 78,35 C88,45 80,65 65,60 C50,70 30,65 22,50 C12,50 12,40 22,35" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" />
+                        <path d="M38,40 Q43,35 48,42" fill="none" stroke="#ef4444" stroke-width="2.5" />
+                        <path d="M62,40 Q57,35 52,42" fill="none" stroke="#ef4444" stroke-width="2.5" />
+                        <circle cx="43" cy="45" r="4.5" fill="#ef4444" />
+                        <circle cx="57" cy="45" r="4.5" fill="#ef4444" />
+                        <path d="M32,54 Q50,68 68,54" fill="none" stroke="#000" stroke-width="3" />
+                        <path d="M15,70 Q50,85 85,70 Q50,55 15,70" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="4" stroke-dasharray="8 4" />
+                    </svg>
+                    <div class="absolute bottom-1 bg-yellow-400 text-slate-950 text-[9px] font-black px-2 py-0.5 rounded uppercase font-sans">EXTREME</div>
+                </div>
+            </div>
+
+            <!-- スカウトボタンエリア -->
+            <div class="flex flex-col sm:flex-row justify-center items-center gap-6 my-auto">
+                <!-- 単発スカウト -->
+                <button id="btn-gasha-single" class="bg-slate-900 border border-purple-500/40 p-6 rounded-2xl w-full sm:w-64 hover:border-purple-400 transform hover:scale-105 active:scale-95 transition-all text-center shadow-xl flex flex-col justify-between items-center">
+                    <span class="text-xs text-gray-400 font-bold tracking-widest uppercase">SINGLE SCOUT</span>
+                    <h3 class="font-extrabold text-xl text-white mt-1">1回 スカウト</h3>
+                    <p class="text-[10px] text-gray-500 mt-2">星3以上キャラクター1体確定</p>
+                    <div class="bg-purple-600 hover:bg-purple-500 text-white font-black px-6 py-3 rounded-xl mt-6 flex items-center space-x-2 shadow-lg w-full justify-center">
+                        <span>💎 5個で引く</span>
+                    </div>
+                </button>
+
+                <!-- 10連スカウト -->
+                <button id="btn-gasha-multi" class="bg-gradient-to-b from-indigo-950/40 to-slate-900 border-2 border-indigo-500/50 p-6 rounded-2xl w-full sm:w-72 hover:border-indigo-400 transform hover:scale-105 active:scale-95 transition-all text-center shadow-2xl flex flex-col justify-between items-center relative overflow-hidden">
+                    <div class="absolute top-0 right-0 bg-yellow-400 text-slate-950 text-[8px] font-black px-3 py-1 uppercase rounded-bl-xl tracking-widest">おまけ付き</div>
+                    <span class="text-xs text-indigo-400 font-bold tracking-widest uppercase">MULTI SCOUT</span>
+                    <h3 class="font-extrabold text-2xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-amber-400 mt-1">10回 スカウト</h3>
+                    <p class="text-[10px] text-indigo-300 font-semibold mt-2">星4超高確率 ＆ 特典ダイヤ付</p>
+                    <div class="bg-indigo-600 hover:bg-indigo-500 text-white font-black px-6 py-3 rounded-xl mt-6 flex items-center space-x-2 shadow-lg w-full justify-center">
+                        <span>💎 50個で引く</span>
+                    </div>
+                </button>
+            </div>
+            <div class="w-24"></div>
+        </div>
+    </div>
+
+    <!-- ガシャ演出オーバーレイ画面 -->
+    <div id="gasha-production-overlay" class="hidden absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden">
+        <!-- 演出フラッグフラッシュキャンバス -->
+        <div id="gasha-flag-ring" class="absolute w-[600px] h-[600px] border-8 rounded-full border-dashed pointer-events-none opacity-0"></div>
+        
+        <div class="z-10 max-w-lg w-full flex flex-col items-center">
+            <!-- 演出テロップ -->
+            <div id="gasha-scout-title" class="cinzel text-amber-500 font-black text-xl md:text-3xl tracking-widest mb-4 uppercase animate-pulse">SCOUT IN PROGRESS</div>
+            
+            <!-- 中央の巨大な宝箱 ＆ 旗ナビゲーター -->
+            <div class="relative w-64 h-64 mb-8 flex items-center justify-center">
+                <!-- たなびくアリーナの旗 -->
+                <div id="gasha-prod-flag" class="absolute inset-0 flex items-center justify-center opacity-70 transform transition-all duration-500 scale-100">
+                    <i id="gasha-prod-flag-icon" class="fa-solid fa-flag text-blue-500 text-8xl drop-shadow-[0_0_20px_rgba(59,130,246,0.6)]"></i>
+                </div>
+                <!-- 宝箱 -->
+                <div id="gasha-prod-chest" class="absolute text-yellow-500 text-7xl animate-bounce mt-4">
+                    <i class="fa-solid fa-gift"></i>
+                </div>
+            </div>
+
+            <!-- タップして結果を見るボタン -->
+            <button id="btn-gasha-pull" class="hidden bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-400 text-slate-950 font-black text-2xl py-5 px-16 rounded-full shadow-2xl glow-gold transform scale-110 active:scale-95 transition-all tracking-widest uppercase animate-bounce">
+                PULL!! <i class="fa-solid fa-hand-fist ml-2"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- ガシャ結果リザルト（獲得カード発表） -->
+    <div id="gasha-result-modal" class="hidden absolute inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto">
+        <div class="max-w-4xl w-full bg-slate-900 border-2 border-purple-500/60 rounded-3xl p-6 md:p-10 shadow-2xl relative">
+            <h2 class="cinzel text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-400 tracking-wider mb-6">SCOUT RESULTS</h2>
+            
+            <!-- 排出カードコンテナ -->
+            <div id="gasha-result-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-8 max-h-[50vh] overflow-y-auto p-2">
+                <!-- 排出されたカード（手配書スタイル）がここに動的に追加されます -->
+            </div>
+
+            <button id="btn-close-gasha-result" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black py-4 px-12 rounded-xl transition duration-200 shadow-xl text-lg w-full sm:w-auto tracking-wider">
+                ガシャを終了する
+            </button>
+        </div>
+    </div>
+
+    <!-- ルール説明 -->
+    <div id="howto-dialog" class="hidden absolute inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4">
+        <div class="bg-slate-900 border border-amber-500/50 rounded-2xl p-6 max-w-lg w-full">
+            <h3 class="cinzel text-2xl text-amber-500 font-black mb-4 flex items-center">
+                <i class="fa-solid fa-skull-crossbones mr-2"></i> ゲームルール & 操作方法
+            </h3>
+            <div class="space-y-4 text-sm text-gray-300 overflow-y-auto max-h-[60vh] pr-2">
+                <div>
+                    <h4 class="font-bold text-amber-400 mb-1">■ 勝利条件</h4>
+                    <p class="leading-relaxed font-semibold">
+                        フィールド上にある5つの「お宝（フラッグ）」を奪い合います。制限時間内に「より多くのフラッグを確保しているチーム」が勝利します！敵のフラッグをすべて奪取（5つ全て確保）すると、パーフェクト勝利となります。
+                    </p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-amber-400 mb-1">■ ガシャ（スカウト）機能 💎</h4>
+                    <p class="leading-relaxed text-gray-300">
+                        ホーム画面や結果画面で手に入る「虹のダイヤ」を使って、新しいキャラクターをアンロックすることができます。
+                        激レア超フェス枠の「ギア5ルフィ（ニカ）」「海賊王ロジャー」「四皇黒髭」を獲得し、バトルを支配しよう！
+                    </p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-amber-400 mb-1">■ ダイヤの獲得方法</h4>
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li><strong>バトル勝利</strong>: ダイヤ15個を獲得！</li>
+                        <li><strong>バトル敗北</strong>: ダイヤ5個を獲得。</li>
+                        <li><strong>KO/奪取の数に応じた追加ボーナス！</strong></li>
+                        <li><strong>ガシャ画面で「無料ダイヤチャージ」をポチれば+100個！</strong></li>
+                    </ul>
+                </div>
+            </div>
+            <button onclick="toggleHowTo(false)" class="w-full mt-6 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3 rounded-xl transition duration-200">
+                了解！
+            </button>
+        </div>
+    </div>
+
+    <!-- ゲームプレイ画面 -->
+    <div id="game-screen" class="hidden absolute inset-0 z-30 select-none">
+        
+        <!-- キャンバス背景 -->
+        <canvas id="gameCanvas" class="absolute inset-0 z-10"></canvas>
+
+        <!-- 上部：スコア・タイマーHUD -->
+        <div class="absolute top-4 left-1/2 transform -translate-x-1/2 w-full max-w-2xl px-4 flex flex-col items-center pointer-events-none z-30">
+            <!-- チームスコア＆タイマー -->
+            <div class="w-full bg-slate-950/85 border-2 border-slate-800/80 rounded-2xl p-3 flex flex-col justify-between items-center shadow-2xl backdrop-blur-md">
+                <div class="w-full flex justify-between items-center">
+                    <!-- 青チーム（味方） -->
+                    <div class="flex items-center space-x-3 w-1/3">
+                        <div class="bg-blue-600 w-10 h-10 rounded-xl flex items-center justify-center font-black text-2xl shadow-lg shadow-blue-500/30 text-white" id="blue-score-badge">0</div>
+                        <div>
+                            <div class="text-[10px] text-blue-400 font-extrabold tracking-widest">味方</div>
+                            <div class="text-sm font-black flex items-center space-x-1">
+                                <i class="fa-solid fa-flag text-blue-500 animate-pulse"></i>
+                                <span id="blue-flag-count" class="text-blue-200">0 / 5</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ゲームタイマー -->
+                    <div class="flex flex-col items-center justify-center w-1/3 text-center">
+                        <div class="text-[9px] text-amber-500 font-black tracking-widest uppercase" id="current-stage-name">LOADING STAGE</div>
+                        <div class="text-3xl font-black tracking-wider text-amber-400 font-mono" id="game-timer">02:00</div>
+                    </div>
+
+                    <!-- 赤チーム（敵） -->
+                    <div class="flex items-center justify-end space-x-3 w-1/3 text-right">
+                        <div>
+                            <div class="text-[10px] text-red-400 font-extrabold tracking-widest">敵</div>
+                            <div class="text-sm font-black flex items-center justify-end space-x-1">
+                                <span id="red-flag-count" class="text-red-200">0 / 5</span>
+                                <i class="fa-solid fa-flag text-red-500 animate-pulse"></i>
+                            </div>
+                        </div>
+                        <div class="bg-red-600 w-10 h-10 rounded-xl flex items-center justify-center font-black text-2xl shadow-lg shadow-red-500/30 text-white" id="red-score-badge">0</div>
+                    </div>
+                </div>
+
+                <!-- チームブーストゲージ -->
+                <div class="w-full flex justify-between items-center px-2 mt-2 pt-1 border-t border-slate-800/60 space-x-4">
+                    <!-- 味方ブースト -->
+                    <div class="flex items-center space-x-1 w-1/2 justify-start">
+                        <span class="text-[8px] text-blue-400 font-black tracking-tighter uppercase">BOOST</span>
+                        <div class="w-24 bg-slate-900 border border-blue-500/30 h-1.5 rounded-full overflow-hidden">
+                            <div id="blue-boost-bar" class="bg-gradient-to-r from-blue-500 to-cyan-400 h-full transition-all duration-300" style="width: 0%;"></div>
+                        </div>
+                        <span id="blue-boost-text" class="text-[8px] font-black text-blue-300">0%</span>
+                    </div>
+                    <!-- 敵ブースト -->
+                    <div class="flex items-center space-x-1 w-1/2 justify-end">
+                        <span id="red-boost-text" class="text-[8px] font-black text-red-300">0%</span>
+                        <div class="w-24 bg-slate-900 border border-red-500/30 h-1.5 rounded-full overflow-hidden">
+                            <div id="red-boost-bar" class="bg-gradient-to-l from-red-500 to-orange-400 h-full transition-all duration-300" style="width: 0%;"></div>
+                        </div>
+                        <span class="text-[8px] text-red-400 font-black tracking-tighter uppercase">BOOST</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 優勢バーグラフ -->
+            <div class="w-full bg-slate-900 h-3 rounded-full overflow-hidden mt-2 flex border border-slate-800 shadow-md">
+                <div id="blue-bar" class="bg-blue-500 h-full transition-all duration-300" style="width: 50%;"></div>
+                <div id="red-bar" class="bg-red-500 h-full transition-all duration-300" style="width: 50%;"></div>
+            </div>
+        </div>
+
+        <!-- 左上：プレイヤー情報HUD -->
+        <div class="absolute top-4 left-4 bg-slate-950/85 border border-slate-800/80 p-3 rounded-xl flex items-center space-x-3 pointer-events-none backdrop-blur-md shadow-lg z-30">
+            <div class="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center overflow-hidden border border-amber-500/40" id="hud-player-avatar"></div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <span id="hud-player-name" class="font-black text-sm tracking-wide text-amber-500">ルフィ</span>
+                    <span id="hud-player-role" class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-black px-1.5 py-0.5 rounded uppercase font-sans">Runner</span>
+                </div>
+                <!-- HPゲージ -->
+                <div class="w-36 bg-slate-800 h-2.5 rounded-full mt-1.5 overflow-hidden border border-slate-700">
+                    <div id="hud-player-hp" class="bg-emerald-500 h-full transition-all duration-100" style="width: 100%;"></div>
+                </div>
+                <div class="text-[9px] text-gray-400 font-semibold mt-1 flex justify-between font-sans">
+                    <span>HP</span>
+                    <span id="hud-player-hp-text">1200 / 1200</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- リアルタイム・キルログ -->
+        <div id="kill-log-container" class="absolute left-4 top-36 z-30 flex flex-col space-y-1.5 pointer-events-none max-w-xs"></div>
+
+        <!-- 右上：ミニマップ -->
+        <div class="absolute top-4 right-4 flex flex-col items-end space-y-2 pointer-events-none z-30">
+            <div class="bg-slate-950/85 border-2 border-slate-800/80 p-1.5 rounded-xl backdrop-blur-md shadow-xl">
+                <div class="text-[9px] text-center text-amber-500 font-extrabold tracking-wider mb-1 uppercase font-sans">MINIMAP</div>
+                <div class="w-32 h-32 relative overflow-hidden bg-slate-900 border border-slate-800 rounded-lg">
+                    <canvas id="minimapCanvas" class="w-full h-full" width="128" height="128"></canvas>
+                </div>
+            </div>
+            <!-- 現在のスコアカウンター -->
+            <div class="bg-slate-950/80 border border-slate-800 p-2 rounded-lg backdrop-sm flex flex-col space-y-0.5 text-right w-28 font-sans">
+                <div class="text-[9px] text-amber-500 font-bold">CURRENT STATS</div>
+                <div class="text-xs font-black text-rose-500 flex justify-between"><span>KOs:</span><span id="live-stat-kos">0</span></div>
+                <div class="text-xs font-black text-blue-400 flex justify-between"><span>FLAGs:</span><span id="live-stat-caps">0</span></div>
+            </div>
+        </div>
+
+        <!-- 左下：モバイルジョイスティック -->
+        <div id="joystick-container" class="absolute bottom-8 left-8 w-32 h-32 bg-slate-950/50 border-2 border-slate-700/50 rounded-full flex items-center justify-center backdrop-blur-md z-30 shadow-2xl">
+            <div id="joystick-knob" class="w-12 h-12 bg-gradient-to-br from-amber-500 to-amber-600 rounded-full shadow-lg transform translate-x-0 translate-y-0 active:scale-95 transition-all cursor-pointer border border-amber-300/40"></div>
+        </div>
+
+        <!-- PC操作用の移動キー表示 -->
+        <div class="absolute bottom-8 left-44 hidden md:flex flex-col space-y-1 bg-slate-950/80 border border-slate-800/50 p-2.5 rounded-xl pointer-events-none z-30 backdrop-blur-sm text-[11px] text-gray-400 font-sans">
+            <span class="text-amber-500 font-bold text-[10px] uppercase tracking-wider mb-1 border-b border-slate-800 pb-1">■ PC操作ガイド</span>
+            <div class="flex items-center space-x-2">
+                <span class="bg-slate-800 text-white px-1.5 py-0.5 rounded font-mono font-bold">W,A,S,D</span>
+                <span>移動する</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="bg-slate-800 text-white px-1.5 py-0.5 rounded font-mono font-bold">SPACE</span>
+                <span>通常攻撃</span>
+            </div>
+        </div>
+
+        <!-- 右下：アクション操作ボタン -->
+        <div class="absolute bottom-8 right-8 flex flex-col items-end space-y-4 z-30 select-none">
+            <div class="flex items-center space-x-4 mb-2">
+                <!-- スキル 2 -->
+                <button id="btn-skill2" class="relative w-16 h-16 bg-slate-900/95 active:bg-slate-850 hover:border-amber-400 text-amber-500 border-2 border-amber-500/40 rounded-full flex flex-col items-center justify-center shadow-xl active:scale-90 transition transform duration-100 font-sans">
+                    <span class="absolute -top-1.5 -right-1.5 bg-slate-950 text-amber-400 font-black border border-amber-500/30 text-[9px] w-5 h-5 rounded-full flex items-center justify-center shadow-md">Q</span>
+                    <span class="text-[9px] font-black text-amber-500/80 uppercase tracking-tighter">Skill 2</span>
+                    <i class="fa-solid fa-burst text-lg" id="btn-skill2-icon"></i>
+                    <span id="btn-skill2-name" class="text-[8px] mt-0.5 font-bold truncate max-w-[55px]">レッドホーク</span>
+                    <div id="skill2-cooldown-overlay" class="absolute inset-0 bg-slate-950/85 rounded-full flex items-center justify-center font-bold text-lg text-white hidden">5s</div>
+                </button>
+
+                <!-- スキル 1 -->
+                <button id="btn-skill1" class="relative w-16 h-16 bg-slate-900/95 active:bg-slate-850 hover:border-amber-400 text-amber-500 border-2 border-amber-500/40 rounded-full flex flex-col items-center justify-center shadow-xl active:scale-90 transition transform duration-100 font-sans">
+                    <span class="absolute -top-1.5 -right-1.5 bg-slate-950 text-amber-400 font-black border border-amber-500/30 text-[9px] w-5 h-5 rounded-full flex items-center justify-center shadow-md">E</span>
+                    <span class="text-[9px] font-black text-amber-500/80 uppercase tracking-tighter">Skill 1</span>
+                    <i class="fa-solid fa-wand-magic-sparkles text-lg" id="btn-skill1-icon"></i>
+                    <span id="btn-skill1-name" class="text-[8px] mt-0.5 font-bold truncate max-w-[55px]">ピストル</span>
+                    <div id="skill1-cooldown-overlay" class="absolute inset-0 bg-slate-950/85 rounded-full flex items-center justify-center font-bold text-lg text-white hidden">3s</div>
+                </button>
+
+                <!-- 回避 -->
+                <button id="btn-dodge" class="relative w-14 h-14 bg-slate-900/95 active:bg-slate-850 hover:border-sky-400 text-sky-400 border-2 border-sky-400/40 rounded-full flex flex-col items-center justify-center shadow-xl active:scale-90 transition transform duration-100 font-sans">
+                    <span class="absolute -top-1.5 -right-1.5 bg-slate-950 text-sky-400 font-black border border-sky-500/30 text-[9px] px-1 h-5 rounded-full flex items-center justify-center shadow-md leading-none font-sans">Shift</span>
+                    <span class="text-[8px] font-black text-sky-400/80 uppercase tracking-tighter">Dodge</span>
+                    <i class="fa-solid fa-angles-right text-base"></i>
+                    <div id="dodge-cooldown-overlay" class="absolute inset-0 bg-slate-950/85 rounded-full flex items-center justify-center font-bold text-sm text-white hidden font-sans">2s</div>
+                </button>
+            </div>
+
+            <!-- 通常攻撃ボタン -->
+            <button id="btn-attack" class="w-24 h-24 bg-gradient-to-br from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 text-slate-950 rounded-full flex flex-col items-center justify-center shadow-2xl active:scale-95 transition transform duration-75 border-4 border-slate-950 relative font-sans">
+                <i class="fa-solid fa-hand-fist text-3xl"></i>
+                <span class="text-[10px] font-black mt-1 uppercase tracking-wider">ATTACK</span>
+                <span class="absolute bottom-1 bg-slate-950 text-amber-400 font-black text-[9px] px-1.5 py-0.5 rounded-full">Space</span>
+            </button>
+        </div>
+
+        <!-- スキルカットイン -->
+        <div id="skill-announcer" class="absolute top-1/3 left-0 w-full flex items-center justify-center z-40 transform translate-y-[-50%] pointer-events-none scale-0 transition-all duration-300">
+            <div class="w-full bg-gradient-to-r from-transparent via-amber-500/90 to-transparent py-4 border-y-2 border-yellow-400 text-center shadow-2xl backdrop-blur-sm">
+                <div class="text-xs text-slate-950 font-black tracking-widest uppercase animate-pulse mb-0.5 font-sans">CHARACTER SKILL ACTIVATED</div>
+                <div id="skill-announcer-char" class="text-white text-lg font-black tracking-wide font-sans">ルフィ</div>
+                <div id="skill-announcer-name" class="cinzel text-4xl md:text-5xl text-slate-950 font-black tracking-widest drop-shadow-[0_2px_10px_rgba(255,255,255,0.8)]">ゴムゴムの火拳銃 (レッドホーク)</div>
+            </div>
+        </div>
+
+        <!-- チームブーストカットイン -->
+        <div id="boost-announcer" class="absolute top-1/3 left-0 w-full flex items-center justify-center z-40 transform translate-y-[-50%] pointer-events-none scale-0 transition-all duration-300">
+            <div class="w-full bg-gradient-to-r from-transparent via-yellow-500 to-transparent py-5 border-y-4 border-yellow-300 text-center shadow-2xl backdrop-blur-md">
+                <div class="text-xs text-slate-950 font-black tracking-widest uppercase animate-ping mb-1 font-sans">TEAM OVERDRIVE ACTIVATED</div>
+                <div id="boost-announcer-team" class="text-white text-xl font-black tracking-widest uppercase glow-gold drop-shadow-md font-sans">味方チームブースト！</div>
+                <div class="cinzel text-5xl md:text-7xl text-slate-950 font-black tracking-widest drop-shadow-[0_2px_15px_rgba(251,191,36,0.9)] animate-pulse">TEAM BOOST!!</div>
+            </div>
+        </div>
+
+        <!-- お宝奪取ポップアップ -->
+        <div id="game-notify" class="absolute inset-x-0 top-1/4 flex flex-col items-center justify-center z-30 pointer-events-none transform scale-0 transition-all duration-200">
+            <div class="bg-slate-950/90 border-2 border-amber-500 rounded-full px-8 py-3 text-center shadow-2xl glow-gold">
+                <span id="game-notify-text" class="text-2xl md:text-3xl font-black tracking-wider uppercase text-amber-500 font-sans">GET TREASURE!</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 結果発表画面 -->
+    <div id="result-screen" class="hidden absolute inset-0 z-40 flex flex-col items-center justify-center bg-slate-950 bg-opacity-95 p-6 text-center">
+        <div class="max-w-2xl w-full bg-slate-900 border-2 border-amber-500 rounded-2xl p-8 shadow-2xl glow-gold relative overflow-hidden">
+            
+            <div class="mb-6">
+                <h1 id="result-title" class="cinzel text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500 tracking-wider">VICTORY</h1>
+                <p id="result-subtitle" class="text-sm text-gray-400 uppercase tracking-widest mt-2 font-sans">Perfect Flag Capture (5-0 Win)</p>
+            </div>
+
+            <!-- 戦績ステータス内訳 -->
+            <div class="grid grid-cols-3 gap-4 mb-4">
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 font-sans">
+                    <div class="text-xs text-gray-500 font-bold uppercase">獲得スコア</div>
+                    <div id="stat-score" class="text-2xl font-extrabold text-amber-500 mt-1">0</div>
+                </div>
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 font-sans">
+                    <div class="text-xs text-gray-500 font-bold uppercase">KO数 (キル)</div>
+                    <div id="stat-kos" class="text-2xl font-extrabold text-rose-500 mt-1">0</div>
+                </div>
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 font-sans">
+                    <div class="text-xs text-gray-500 font-bold uppercase">旗奪取 (フラッグ)</div>
+                    <div id="stat-caps" class="text-2xl font-extrabold text-blue-500 mt-1">0</div>
+                </div>
+            </div>
+
+            <!-- ダイヤボーナス獲得演出 -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-amber-500/20 mb-4 flex flex-col items-center font-sans">
+                <div class="text-xs text-amber-500 font-bold uppercase tracking-widest mb-1">BATTLE REWARD</div>
+                <div class="text-3xl font-extrabold text-amber-400 tracking-widest font-mono flex items-center space-x-2">
+                    <span>💎</span>
+                    <span id="stat-diamonds-earned">+15</span>
+                    <span class="text-xs text-gray-400 font-medium">虹のダイヤ</span>
+                </div>
+            </div>
+
+            <!-- 懸賞金増加 -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-amber-500/10 mb-6 flex flex-col items-center font-sans">
+                <div class="text-xs text-amber-500 font-bold uppercase tracking-widest mb-1">NEW BOUNTY INCREASE</div>
+                <div class="text-2xl font-extrabold text-yellow-400 tracking-widest font-mono animate-pulse" id="stat-bounty">฿ 0</div>
+            </div>
+
+            <!-- アクションボタン -->
+            <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
+                <button id="btn-play-again" class="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-4 px-8 rounded-xl transition duration-200 shadow-lg text-lg font-sans">
+                    もう一度挑戦する <i class="fa-solid fa-arrow-rotate-right ml-1"></i>
+                </button>
+                <button id="btn-exit-to-menu" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-4 px-8 rounded-xl transition duration-200 border border-slate-700 text-lg font-sans">
+                    メニューに戻る
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- オーディオ・サウンド合成エンジン -->
+    <script>
+        class AudioEngine {
+            constructor() {
+                this.ctx = null;
+                this.bgmTimeout = null;
+                this.isPlayingBGM = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            // バトルBGMループ合成
+            startBGM() {
+                if (this.isPlayingBGM) return;
+                this.isPlayingBGM = true;
+                this.init();
+
+                let step = 0;
+
+                const runLoop = () => {
+                    if (!this.isPlayingBGM) return;
+                    
+                    const isAnyBoostActive = (blueBoostTimer > 0 || redBoostTimer > 0);
+                    const tempo = isAnyBoostActive ? 165 : 135;
+                    const stepTime = 60 / tempo / 2; // 八分音符
+
+                    try {
+                        if (step % 4 === 0) {
+                            this.playKick(isAnyBoostActive ? 55 : 45, isAnyBoostActive ? 0.55 : 0.4, 0.22);
+                        }
+                        if (step % 8 === 4) {
+                            this.playSnare(isAnyBoostActive ? 0.28 : 0.2, 0.15);
+                        }
+
+                        const bassNotes = isAnyBoostActive ? [65.41, 65.41, 73.42, 82.41, 98.00, 110.00] : [55, 55, 65.41, 65.41, 73.42, 73.42, 82.41, 98.00];
+                        const note = bassNotes[Math.floor(step / 2) % bassNotes.length];
+                        this.playSynth(note, 'sawtooth', isAnyBoostActive ? 0.07 : 0.05, 0.18);
+
+                        if (step % 2 === 0 && Math.random() > (isAnyBoostActive ? 0.15 : 0.3)) {
+                            const leadNotes = [110, 130.81, 146.83, 164.81, 196.00, 220, 261.63, 293.66, 329.63, 392.00];
+                            const leadNote = leadNotes[Math.floor(Math.random() * leadNotes.length)];
+                            this.playSynth(leadNote, 'square', isAnyBoostActive ? 0.04 : 0.02, 0.12, 0.04);
+                        }
+
+                        step++;
+                    } catch (e) {
+                        console.error("BGMエラー:", e);
+                    }
+
+                    this.bgmTimeout = setTimeout(runLoop, stepTime * 1000);
+                };
+
+                runLoop();
+            }
+
+            stopBGM() {
+                this.isPlayingBGM = false;
+                if (this.bgmTimeout) {
+                    clearTimeout(this.bgmTimeout);
+                    this.bgmTimeout = null;
+                }
+            }
+
+            playKick(freq, vol, duration) {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            }
+
+            playSnare(vol, duration) {
+                if (!this.ctx) return;
+                const bufferSize = this.ctx.sampleRate * duration;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.setValueAtTime(1000, this.ctx.currentTime);
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                noise.start();
+                noise.stop(this.ctx.currentTime + duration);
+            }
+
+            playSynth(freq, type, vol, duration, attack = 0.01) {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+
+                gain.gain.setValueAtTime(0.001, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(vol, this.ctx.currentTime + attack);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            }
+
+            playSFX(type) {
+                this.init();
+                if (!this.ctx) return;
+
+                switch (type) {
+                    case 'slash':
+                        this.playSynth(440, 'triangle', 0.15, 0.15, 0.02);
+                        this.playSynth(880, 'sawtooth', 0.1, 0.1, 0.01);
+                        break;
+                    case 'hit':
+                        this.playKick(180, 0.3, 0.1);
+                        this.playSnare(0.2, 0.12);
+                        break;
+                    case 'capture_start':
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.4);
+                        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+                        osc.start();
+                        osc.stop(this.ctx.currentTime + 0.4);
+                        break;
+                    case 'capture_done':
+                        this.playSynth(523.25, 'triangle', 0.15, 0.1); 
+                        setTimeout(() => this.playSynth(659.25, 'triangle', 0.15, 0.1), 100); 
+                        setTimeout(() => this.playSynth(783.99, 'triangle', 0.2, 0.3), 200); 
+                        break;
+                    case 'skill_activate':
+                        this.playKick(100, 0.6, 0.5);
+                        this.playSynth(80, 'sawtooth', 0.4, 0.6);
+                        this.playSnare(0.4, 0.5);
+                        break;
+                    case 'team_boost':
+                        this.playKick(80, 0.8, 0.6);
+                        this.playSynth(220, 'sawtooth', 0.3, 0.5);
+                        setTimeout(() => this.playSynth(440, 'sawtooth', 0.3, 0.3), 100);
+                        setTimeout(() => this.playSynth(880, 'square', 0.4, 0.8), 200);
+                        break;
+                    case 'ko':
+                        this.playSynth(300, 'sawtooth', 0.3, 0.4, 0.05);
+                        this.playKick(60, 0.4, 0.4);
+                        break;
+                    case 'victory':
+                        this.stopBGM();
+                        this.playSynth(261.63, 'square', 0.15, 0.15); 
+                        setTimeout(() => this.playSynth(329.63, 'square', 0.15, 0.15), 150); 
+                        setTimeout(() => this.playSynth(392.00, 'square', 0.15, 0.15), 300); 
+                        setTimeout(() => this.playSynth(523.25, 'square', 0.3, 0.8), 450); 
+                        break;
+                    case 'defeat':
+                        this.stopBGM();
+                        this.playSynth(293.66, 'sawtooth', 0.2, 0.2); 
+                        setTimeout(() => this.playSynth(277.18, 'sawtooth', 0.2, 0.2), 200); 
+                        setTimeout(() => this.playSynth(261.63, 'sawtooth', 0.2, 0.6), 400); 
+                        break;
+                    case 'gasha_scout':
+                        this.playKick(70, 0.6, 1.2);
+                        this.playSynth(180, 'sawtooth', 0.2, 0.8);
+                        break;
+                    case 'gasha_extreme':
+                        this.playKick(60, 0.9, 0.8);
+                        this.playSynth(261.63, 'sawtooth', 0.4, 0.2); 
+                        setTimeout(() => this.playSynth(329.63, 'sawtooth', 0.4, 0.2), 100); 
+                        setTimeout(() => this.playSynth(392.00, 'sawtooth', 0.4, 0.2), 200); 
+                        setTimeout(() => this.playSynth(523.25, 'square', 0.5, 1.5), 300); 
+                        setTimeout(() => this.playSynth(1046.50, 'square', 0.5, 1.2), 500); 
+                        break;
+                }
+            }
+        }
+
+        const audio = new AudioEngine();
+    </script>
+
+    <!-- メインゲーム構造・キャラクター定義・物理エンジン -->
+    <script>
+        // 【仕様変更】最初は「ルフィ」のみ使用可能、それ以外はガチャからアンロック
+        let unlockedCharacters = {
+            luffy: true,
+            zoro: false,
+            law: false,
+            shanks: false,
+            kaido: false,
+            yamato: false,
+            gear5: false,
+            roger: false,  // 新追加超フェス
+            teach: false   // 新追加超フェス
+        };
+
+        let playerDiamonds = 150; // 虹のダイヤ初期数
+
+        const CHARACTERS = {
+            luffy: {
+                name: "ルフィ",
+                title: "麦わらの一味・船長",
+                role: "runner",
+                maxHp: 1200,
+                attack: 65,
+                defense: 45,
+                speed: 4.8,
+                captureSpeedMultiplier: 1.5,
+                skills: {
+                    skill1: {
+                        name: "ゴムゴムのピストル",
+                        cooldown: 4000,
+                        type: "projectile",
+                        damage: 180,
+                        icon: "fa-solid fa-hand-fist",
+                        color: "#ef4444"
+                    },
+                    skill2: {
+                        name: "火拳銃 (レッドホーク)",
+                        cooldown: 10000,
+                        type: "dash_aoe",
+                        damage: 350,
+                        icon: "fa-solid fa-fire",
+                        color: "#f59e0b"
+                    }
+                },
+                svg: `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                        <circle cx="50" cy="45" r="25" fill="#fbcfe8" />
+                        <path d="M25,35 Q50,5 75,35 Q50,45 25,35" fill="#facc15" stroke="#ca8a04" stroke-width="2" />
+                        <circle cx="50" cy="18" r="14" fill="#ef4444" opacity="0.8" />
+                        <path d="M30,35 Q50,22 70,35" fill="#facc15" />
+                        <circle cx="42" cy="45" r="3" fill="#000" />
+                        <circle cx="58" cy="45" r="3" fill="#000" />
+                        <path d="M48,47 L46,52" stroke="#000" stroke-width="1.5" />
+                        <path d="M43,55 Q50,62 57,55" fill="none" stroke="#000" stroke-width="2" />
+                        <path d="M35,70 C35,60 65,60 65,70 L60,90 L40,90 Z" fill="#ef4444" />
+                    </svg>
+                `
+            },
+            zoro: {
+                name: "ゾロ",
+                title: "海賊狩りの剣豪",
+                role: "attacker",
+                maxHp: 1250,
+                attack: 110,
+                defense: 55,
+                speed: 4.5,
+                captureSpeedMultiplier: 1.0,
+                skills: {
+                    skill1: {
+                        name: "極楽・鬼斬り",
+                        cooldown: 4500,
+                        type: "dash_slash",
+                        damage: 280,
+                        icon: "fa-solid fa-bolt",
+                        color: "#10b981"
+                    },
+                    skill2: {
+                        name: "一大三千大千世界",
+                        cooldown: 11000,
+                        type: "spinning_slashes",
+                        damage: 520,
+                        icon: "fa-solid fa-tornado",
+                        color: "#059669"
+                    }
+                },
+                svg: `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                        <circle cx="50" cy="45" r="25" fill="#fbcfe8" />
+                        <path d="M25,40 C20,25 35,15 50,20 C65,15 80,25 75,40 C65,30 35,30 25,40" fill="#10b981" />
+                        <circle cx="42" cy="45" r="3" fill="#000" />
+                        <line x1="55" y1="41" x2="61" y2="49" stroke="#000" stroke-width="2" />
+                        <path d="M40,55 Q50,50 60,55" fill="none" stroke="#000" stroke-width="2.5" />
+                        <rect x="30" y="65" width="40" height="25" fill="#064e3b" rx="2" />
+                        <rect x="48" y="47" width="15" height="4" fill="#facc15" transform="rotate(-15 48 47)" />
+                    </svg>
+                `
+            },
+            law: {
+                name: "ロー",
+                title: "ハートの海賊団・船長",
+                role: "runner",
+                maxHp: 1150,
+                attack: 75,
+                defense: 45,
+                speed: 4.6,
+                captureSpeedMultiplier: 1.5,
+                skills: {
+                    skill1: {
+                        name: "ROOM (シャンブルズ)",
+                        cooldown: 8000,
+                        type: "room_teleport",
+                        damage: 150,
+                        icon: "fa-solid fa-expand",
+                        color: "#22d3ee"
+                    },
+                    skill2: {
+                        name: "ラジオナイフ",
+                        cooldown: 11000,
+                        type: "electric_slash",
+                        damage: 380,
+                        icon: "fa-solid fa-bolt",
+                        color: "#06b6d4"
+                    }
+                },
+                svg: `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                        <circle cx="50" cy="46" r="24" fill="#fbcfe8" />
+                        <path d="M22,38 Q50,14 78,38 C78,25 22,25 22,38" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5" />
+                        <ellipse cx="50" cy="30" rx="26" ry="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" />
+                        <circle cx="38" cy="28" r="3.5" fill="#1e293b" />
+                        <circle cx="52" cy="24" r="4" fill="#1e293b" />
+                        <circle cx="64" cy="30" r="3" fill="#1e293b" />
+                        <path d="M24,37 L76,37 L70,42 L30,42 Z" fill="#1e293b" />
+                        <circle cx="40" cy="49" r="3" fill="#000" />
+                        <circle cx="60" cy="49" r="3" fill="#000" />
+                        <path d="M44,59 Q50,62 56,59" fill="none" stroke="#000" stroke-width="2" />
+                    </svg>
+                `
+            },
+            shanks: {
+                name: "シャンクス",
+                title: "赤髪海賊団・大頭",
+                role: "attacker",
+                maxHp: 1300,
+                attack: 90,
+                defense: 55,
+                speed: 4.2,
+                captureSpeedMultiplier: 1.0,
+                skills: {
+                    skill1: {
+                        name: "神避 (赤髪の剣閃)",
+                        cooldown: 6000,
+                        type: "massive_wave",
+                        damage: 260,
+                        icon: "fa-solid fa-wave-square",
+                        color: "#dc2626"
+                    },
+                    skill2: {
+                        name: "覇王色の覇気 (スタン)",
+                        cooldown: 14000,
+                        type: "haki_stun",
+                        damage: 280,
+                        icon: "fa-solid fa-circle-nodes",
+                        color: "#7c3aed"
+                    }
+                },
+                svg: `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                        <circle cx="50" cy="45" r="25" fill="#fbcfe8" />
+                        <path d="M25,40 C20,20 35,15 50,22 C65,15 80,20 75,40 C65,28 35,28 25,40" fill="#dc2626" />
+                        <circle cx="58" cy="45" r="3" fill="#000" />
+                        <path d="M35,41 L43,49 M38,40 L46,48 M32,44 L40,52" stroke="#dc2626" stroke-width="1.5" />
+                        <circle cx="42" cy="46" r="2.5" fill="#000" />
+                        <path d="M42,56 Q50,54 58,56" fill="none" stroke="#000" stroke-width="2" />
+                    </svg>
+                `
+            },
+            kaido: {
+                name: "カイドウ",
+                title: "百獣海賊団・総督",
+                role: "defender",
+                maxHp: 1800,
+                attack: 60,
+                defense: 80,
+                speed: 3.2,
+                captureSpeedMultiplier: 0.7,
+                skills: {
+                    skill1: {
+                        name: "金剛・雷鳴八卦",
+                        cooldown: 7000,
+                        type: "heavy_knockback",
+                        damage: 200,
+                        icon: "fa-solid fa-bolt-lightning",
+                        color: "#6366f1"
+                    },
+                    skill2: {
+                        name: "熱息 (ボロブレス)",
+                        cooldown: 15000,
+                        type: "fire_beam",
+                        damage: 420,
+                        icon: "fa-solid fa-dragon",
+                        color: "#ea580c"
+                    }
+                },
+                svg: `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                        <circle cx="50" cy="45" r="28" fill="#a5b4fc" />
+                        <path d="M15,40 C10,15 90,15 85,40" fill="#312e81" />
+                        <path d="M30,25 Q15,5 28,18 Q35,22 30,25 M70,25 Q85,5 72,18" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5" />
+                        <circle cx="40" cy="45" r="3.5" fill="#000" />
+                        <circle cx="60" cy="45" r="3.5" fill="#000" />
+                        <path d="M30,55 Q50,45 70,55" fill="none" stroke="#000" stroke-width="3" />
+                    </svg>
+                `
+            },
+            yamato: {
+                name: "ヤマト",
+                title: "鬼姫・おでんの意志",
+                role: "attacker",
+                maxHp: 1350,
+                attack: 95,
+                defense: 65,
+                speed: 4.3,
+                captureSpeedMultiplier: 1.0,
+                skills: {
+                    skill1: {
+                        name: "無侍氷牙 (アイス)",
+                        cooldown: 7500,
+                        type: "ice_breath",
+                        damage: 250,
+                        icon: "fa-solid fa-snowflake",
+                        color: "#34d399"
+                    },
+                    skill2: {
+                        name: "鳴鏑 (なりかぶら)",
+                        cooldown: 12000,
+                        type: "pierce_blast",
+                        damage: 460,
+                        icon: "fa-solid fa-wave-square",
+                        color: "#e11d48"
+                    }
+                },
+                svg: `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                        <circle cx="50" cy="45" r="25" fill="#fbcfe8" />
+                        <path d="M22,35 C20,15 35,8 50,15 C65,8 80,15 78,35 C65,22 35,22 22,35" fill="#ffffff" />
+                        <path d="M25,25 Q15,10 20,2 C23,8 28,15 25,25 M75,25 Q85,10 80,2 C77,8 72,15 75,25" fill="#ef4444" />
+                        <circle cx="42" cy="45" r="3.5" fill="#000" />
+                        <circle cx="58" cy="45" r="3.5" fill="#000" />
+                        <path d="M43,55 Q50,60 57,55" fill="none" stroke="#000" stroke-width="2" />
+                        <path d="M20,35 L12,65 L25,50 Z M80,35 L88,65 L75,50 Z" fill="#34d399" />
+                    </svg>
+                `
+            },
+            gear5: {
+                name: "ギア5 ルフィ",
+                title: "超フェス・太陽の神ニカ",
+                role: "runner",
+                maxHp: 1650,
+                attack: 105,
+                defense: 70,
+                speed: 5.2,
+                captureSpeedMultiplier: 1.6,
+                isExtreme: true,
+                skills: {
+                    skill1: {
+                        name: "ゴムゴムの「神鳴り」",
+                        cooldown: 8000,
+                        type: "lightning_strike",
+                        damage: 320,
+                        icon: "fa-solid fa-bolt",
+                        color: "#22d3ee"
+                    },
+                    skill2: {
+                        name: "ゴムゴムの「猿神銃」",
+                        cooldown: 13000,
+                        type: "bajrang_gun",
+                        damage: 580,
+                        icon: "fa-solid fa-expand",
+                        color: "#f59e0b"
+                    }
+                },
+                svg: `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                        <circle cx="50" cy="45" r="25" fill="#fbcfe8" />
+                        <path d="M22,35 C10,25 20,5 38,10 C45,2 55,2 62,10 C80,5 90,25 78,35 C88,45 80,65 65,60 C50,70 30,65 22,50 C12,50 12,40 22,35" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" />
+                        <path d="M38,40 Q43,35 48,42" fill="none" stroke="#ef4444" stroke-width="2.5" />
+                        <path d="M62,40 Q57,35 52,42" fill="none" stroke="#ef4444" stroke-width="2.5" />
+                        <circle cx="43" cy="45" r="4.5" fill="#ef4444" />
+                        <circle cx="43" cy="45" r="1.5" fill="#ffffff" />
+                        <circle cx="57" cy="45" r="4.5" fill="#ef4444" />
+                        <circle cx="57" cy="45" r="1.5" fill="#ffffff" />
+                        <path d="M32,54 Q50,68 68,54" fill="none" stroke="#000" stroke-width="3" />
+                        <path d="M35,55 Q50,66 65,55" fill="#ffffff" stroke="#000" stroke-width="1" />
+                        <path d="M15,70 Q50,85 85,70 Q50,55 15,70" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="4" stroke-dasharray="8 4" />
+                    </svg>
+                `
+            },
+            roger: {
+                name: "ゴールド・D・ロジャー",
+                title: "超フェス・伝説の海賊王",
+                role: "attacker",
+                maxHp: 1600,
+                attack: 120,
+                defense: 65,
+                speed: 4.8,
+                captureSpeedMultiplier: 1.0,
+                isExtreme: true,
+                skills: {
+                    skill1: {
+                        name: "神避 (かむさり)",
+                        cooldown: 8000,
+                        type: "kamusari",
+                        damage: 480,
+                        icon: "fa-solid fa-bolt",
+                        color: "#dc2626"
+                    },
+                    skill2: {
+                        name: "海賊王の覇気",
+                        cooldown: 14000,
+                        type: "king_haki",
+                        damage: 350,
+                        icon: "fa-solid fa-circle-nodes",
+                        color: "#991b1b"
+                    }
+                },
+                svg: `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                        <circle cx="50" cy="45" r="25" fill="#fbcfe8" />
+                        <path d="M20,38 C20,15 80,15 80,38" fill="#7f1d1d" />
+                        <path d="M30,22 L70,22 L65,30 L35,30 Z" fill="#1e1b4b" stroke="#facc15" stroke-width="2" />
+                        <ellipse cx="50" cy="50" rx="6" ry="3" fill="#000" />
+                        <circle cx="40" cy="44" r="3.5" fill="#000" />
+                        <circle cx="60" cy="44" r="3.5" fill="#000" />
+                        <path d="M28,52 Q50,48 72,52" stroke="#000000" stroke-width="3" fill="none" />
+                        <path d="M35,62 Q50,72 65,62" stroke="#000000" stroke-width="2" fill="none" />
+                        <path d="M20,68 C20,58 80,58 80,68 L75,85 L25,85 Z" fill="#7f1d1d" />
+                    </svg>
+                `
+            },
+            teach: {
+                name: "マーシャル・D・ティーチ",
+                title: "超フェス・四皇 黒髭",
+                role: "defender",
+                maxHp: 1900,
+                attack: 85,
+                defense: 80,
+                speed: 3.5,
+                captureSpeedMultiplier: 0.8,
+                isExtreme: true,
+                skills: {
+                    skill1: {
+                        name: "闇水 (くらみず)",
+                        cooldown: 9000,
+                        type: "kuramizu",
+                        damage: 220,
+                        icon: "fa-solid fa-compress",
+                        color: "#581c87"
+                    },
+                    skill2: {
+                        name: "震天動地",
+                        cooldown: 15000,
+                        type: "quake_blast",
+                        damage: 540,
+                        icon: "fa-solid fa-house-crack",
+                        color: "#3b82f6"
+                    }
+                },
+                svg: `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                        <circle cx="50" cy="45" r="26" fill="#fbcfe8" />
+                        <path d="M20,38 Q50,8 80,38 C80,22 20,22 20,38" fill="#1e1e1e" />
+                        <path d="M25,28 L75,28 L70,35 L30,35 Z" fill="#3b0764" />
+                        <circle cx="38" cy="44" r="4.5" fill="#000" />
+                        <circle cx="62" cy="44" r="4.5" fill="#000" />
+                        <!-- 黒髭のひげ -->
+                        <path d="M24,56 Q50,75 76,56 Q50,90 24,56" fill="#111111" />
+                        <path d="M40,54 Q50,60 60,54" fill="none" stroke="#000" stroke-width="2.5" />
+                    </svg>
+                `
+            }
+        };
+
+        // 各キャラクター画像のプリロード処理
+        for (const key in CHARACTERS) {
+            const char = CHARACTERS[key];
+            char.img = new Image();
+            char.img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(char.svg);
+        }
+
+        // チームブーストステート
+        let blueBoostGauge = 0;
+        let redBoostGauge = 0;
+        let blueBoostTimer = 0; 
+        let redBoostTimer = 0;
+
+        // ステージ定義
+        const STAGES = {
+            sabaody: {
+                name: "シャボンディ諸島",
+                bgColor: "#041b18",
+                gridColor: "#083731",
+                boundaryColor: "#14b8a6",
+                obstacleColor1: "#115e59",
+                obstacleColor2: "#134e4a",
+                obstacleStroke: "#2dd4bf",
+                particleColor: "rgba(45, 212, 191, 0.25)",
+                particleType: "bubble",
+                themeName: "SABAODY ARCHIPELAGO"
+            },
+            alabasta: {
+                name: "アラバスタ砂漠",
+                bgColor: "#1a1204",
+                gridColor: "#3d2708",
+                boundaryColor: "#f59e0b",
+                obstacleColor1: "#78350f",
+                obstacleColor2: "#451a03",
+                obstacleStroke: "#f59e0b",
+                particleColor: "rgba(245, 158, 11, 0.25)",
+                particleType: "dust",
+                themeName: "ALABASTA DESERT"
+            },
+            marineford: {
+                name: "マリンフォード",
+                bgColor: "#081121",
+                gridColor: "#102342",
+                boundaryColor: "#3b82f6",
+                obstacleColor1: "#1e3a8a",
+                obstacleColor2: "#172554",
+                obstacleStroke: "#60a5fa",
+                particleColor: "rgba(147, 197, 253, 0.25)",
+                particleType: "snow",
+                themeName: "MARINEFORD ARENA"
+            }
+        };
+
+        let activeStage = STAGES.sabaody; 
+
+        const WORLD_SIZE = 1800;
+        const FLAG_CAPTURE_RADIUS = 100;
+        const OBSTACLES_COUNT = 8; 
+
+        // 障害物
+        const OBSTACLES = [];
+        function generateObstacles() {
+            OBSTACLES.length = 0;
+            const seedRandom = (s) => {
+                let t = s ^ 123456789;
+                t = (t ^ (t >> 15)) * (t | 1);
+                t ^= t + (t ^ (t >> 7)) * (t | 61);
+                return ((t ^ (t >> 14)) >>> 0) / 4294967296;
+            };
+
+            for (let i = 0; i < OBSTACLES_COUNT; i++) {
+                const x = 350 + seedRandom(i * 10) * (WORLD_SIZE - 700);
+                const y = 250 + seedRandom(i * 20) * (WORLD_SIZE - 500);
+                const w = 80 + seedRandom(i * 30) * 110;
+                const h = 80 + seedRandom(i * 40) * 110;
+                OBSTACLES.push({ x, y, w, h });
+            }
+        }
+    </script>
+
+    <!-- エフェクト描画システム -->
+    <script>
+        class ParticleSystem {
+            constructor() {
+                this.particles = [];
+                this.damageTexts = [];
+                this.envParticles = [];
+            }
+
+            spawnDust(x, y, color = '#ffffff') {
+                for (let i = 0; i < 3; i++) {
+                    this.particles.push({
+                        type: 'dust',
+                        x: x + (Math.random() - 0.5) * 15,
+                        y: y + (Math.random() - 0.5) * 15,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        alpha: 0.7,
+                        size: 3 + Math.random() * 5,
+                        color: color,
+                        decay: 0.03
+                    });
+                }
+            }
+
+            spawnBlood(x, y, count = 12, vxFactor = 1, vyFactor = 1, color = null) {
+                const finalColor = color || (Math.random() > 0.45 ? '#ff2a6d' : '#facc15');
+                for (let i = 0; i < count; i++) {
+                    this.particles.push({
+                        type: 'spark',
+                        x: x,
+                        y: y,
+                        vx: (Math.random() - 0.5) * 10 * vxFactor,
+                        vy: (Math.random() - 0.5) * 10 * vyFactor,
+                        alpha: 1.0,
+                        size: 2.5 + Math.random() * 4,
+                        color: finalColor,
+                        decay: 0.04
+                    });
+                }
+            }
+
+            spawnSlashArc(x, y, angle, radius, color) {
+                this.particles.push({
+                    type: 'slash_arc',
+                    x: x,
+                    y: y,
+                    angle: angle,
+                    radius: radius,
+                    currentRadius: 10,
+                    alpha: 1.0,
+                    color: color,
+                    decay: 0.04
+                });
+            }
+
+            spawnLightning(startX, startY, endX, endY, color) {
+                this.particles.push({
+                    type: 'lightning',
+                    startX: startX,
+                    startY: startY,
+                    endX: endX,
+                    endY: endY,
+                    alpha: 1.0,
+                    color: color,
+                    decay: 0.06
+                });
+            }
+
+            spawnHealSpark(x, y) {
+                for (let i = 0; i < 10; i++) {
+                    this.particles.push({
+                        type: 'spark',
+                        x: x + (Math.random() - 0.5) * 35,
+                        y: y + (Math.random() - 0.5) * 35,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: -2 - Math.random() * 3,
+                        alpha: 1.0,
+                        size: 3 + Math.random() * 4,
+                        color: '#10b981',
+                        decay: 0.03
+                    });
+                }
+            }
+
+            spawnBoostAura(x, y) {
+                for (let i = 0; i < 2; i++) {
+                    this.particles.push({
+                        type: 'spark',
+                        x: x + (Math.random() - 0.5) * 40,
+                        y: y + (Math.random() - 0.5) * 40,
+                        vx: (Math.random() - 0.5) * 1,
+                        vy: -2 - Math.random() * 2,
+                        alpha: 1.0,
+                        size: 2.5 + Math.random() * 3.5,
+                        color: '#fbbf24', 
+                        decay: 0.025
+                    });
+                }
+            }
+
+            spawnSkillBlast(x, y, color, sizeMultiplier = 1) {
+                this.particles.push({
+                    type: 'shockwave',
+                    x: x,
+                    y: y,
+                    radius: 15,
+                    maxRadius: 120 * sizeMultiplier,
+                    alpha: 1.0,
+                    color: color,
+                    decay: 0.04
+                });
+
+                for (let i = 0; i < 15; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const sp = 3 + Math.random() * 12;
+                    this.particles.push({
+                        type: 'spark',
+                        x: x,
+                        y: y,
+                        vx: Math.cos(angle) * sp,
+                        vy: Math.sin(angle) * sp,
+                        alpha: 1.0,
+                        size: 3 + Math.random() * 5,
+                        color: color,
+                        decay: 0.025
+                    });
+                }
+            }
+
+            spawnDamageText(x, y, text, color = '#ffffff', isCritical = false) {
+                this.damageTexts.push({
+                    x: x,
+                    y: y - 25,
+                    vy: -2 - Math.random() * 2,
+                    vx: (Math.random() - 0.5) * 3,
+                    text: text,
+                    alpha: 1.0,
+                    color: color,
+                    size: isCritical ? 28 : 18,
+                    scale: 1.6
+                });
+            }
+
+            updateEnvParticles() {
+                while (this.envParticles.length < 60) {
+                    this.envParticles.push({
+                        x: Math.random() * WORLD_SIZE,
+                        y: Math.random() * WORLD_SIZE,
+                        vx: (Math.random() - 0.3) * 1.5,
+                        vy: activeStage.particleType === 'snow' ? 1 + Math.random() * 2 : -0.5 - Math.random() * 1,
+                        size: activeStage.particleType === 'bubble' ? 4 + Math.random() * 10 : 2 + Math.random() * 5,
+                        alpha: 0.2 + Math.random() * 0.5,
+                        pulse: Math.random() * Math.PI
+                    });
+                }
+
+                for (let i = this.envParticles.length - 1; i >= 0; i--) {
+                    const ep = this.envParticles[i];
+                    ep.x += ep.vx;
+                    ep.y += ep.vy;
+                    ep.pulse += 0.02;
+
+                    if (ep.x < 0 || ep.x > WORLD_SIZE || ep.y < 0 || ep.y > WORLD_SIZE) {
+                        this.envParticles.splice(i, 1);
+                    }
+                }
+            }
+
+            update() {
+                // 安全装置：パーティクルやテキストが溜まりすぎてクラッシュするのを徹底防御
+                if (this.particles.length > 400) {
+                    this.particles.splice(0, this.particles.length - 400);
+                }
+                if (this.damageTexts.length > 50) {
+                    this.damageTexts.splice(0, this.damageTexts.length - 50);
+                }
+
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx || 0;
+                    p.y += p.vy || 0;
+                    
+                    if (p.type === 'shockwave') {
+                        p.radius += (p.maxRadius - p.radius) * 0.18;
+                    } else if (p.type === 'slash_arc') {
+                        p.currentRadius += (p.radius - p.currentRadius) * 0.15;
+                    }
+                    
+                    p.alpha -= p.decay || 0.02;
+
+                    if (p.alpha <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+
+                for (let i = this.damageTexts.length - 1; i >= 0; i--) {
+                    const dt = this.damageTexts[i];
+                    dt.x += dt.vx;
+                    dt.y += dt.vy;
+                    dt.alpha -= 0.025;
+                    if (dt.scale > 1.0) dt.scale -= 0.07;
+
+                    if (dt.alpha <= 0) {
+                        this.damageTexts.splice(i, 1);
+                    }
+                }
+
+                this.updateEnvParticles();
+            }
+
+            draw(ctx, camera) {
+                ctx.save();
+                for (const ep of this.envParticles) {
+                    const screenX = ep.x - camera.x;
+                    const screenY = ep.y - camera.y;
+
+                    if (screenX >= -50 && screenX <= ctx.canvas.width + 50 && screenY >= -50 && screenY <= ctx.canvas.height + 50) {
+                        ctx.globalAlpha = ep.alpha;
+                        ctx.fillStyle = activeStage.particleColor;
+
+                        if (activeStage.particleType === 'bubble') {
+                            ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+                            ctx.lineWidth = 1;
+                            ctx.beginPath();
+                            ctx.arc(screenX, screenY, ep.size, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.stroke();
+                        } else {
+                            ctx.beginPath();
+                            ctx.arc(screenX, screenY, ep.size, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+                }
+
+                ctx.globalCompositeOperation = 'lighter'; 
+                for (const p of this.particles) {
+                    const screenX = p.x - camera.x;
+                    const screenY = p.y - camera.y;
+
+                    ctx.globalAlpha = Math.max(0, p.alpha);
+                    if (p.type === 'dust' || p.type === 'spark') {
+                        ctx.fillStyle = p.color;
+                        ctx.beginPath();
+                        ctx.arc(screenX, screenY, p.size, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else if (p.type === 'shockwave') {
+                        ctx.strokeStyle = p.color;
+                        ctx.lineWidth = 5;
+                        ctx.beginPath();
+                        ctx.arc(screenX, screenY, p.radius, 0, Math.PI * 2);
+                        ctx.stroke();
+                    } else if (p.type === 'slash_arc') {
+                        ctx.strokeStyle = p.color;
+                        ctx.lineWidth = 6;
+                        ctx.beginPath();
+                        ctx.arc(screenX, screenY, p.currentRadius, p.angle - Math.PI/3, p.angle + Math.PI/3);
+                        ctx.stroke();
+                        
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(screenX, screenY, p.currentRadius, p.angle - Math.PI/3.5, p.angle + Math.PI/3.5);
+                        ctx.stroke();
+                    } else if (p.type === 'lightning') {
+                        const sX = p.startX - camera.x;
+                        const sY = p.startY - camera.y;
+                        const eX = p.endX - camera.x;
+                        const eY = p.endY - camera.y;
+
+                        ctx.strokeStyle = p.color;
+                        ctx.lineWidth = 4;
+                        ctx.beginPath();
+                        ctx.moveTo(sX, sY);
+
+                        const segments = 5;
+                        let curX = sX;
+                        let curY = sY;
+                        for (let j = 1; j < segments; j++) {
+                            const ratio = j / segments;
+                            const targetX = sX + (eX - sX) * ratio;
+                            const targetY = sY + (eY - sY) * ratio;
+                            
+                            const offsetAmount = 25;
+                            const midX = targetX + (Math.random() - 0.5) * offsetAmount;
+                            const midY = targetY + (Math.random() - 0.5) * offsetAmount;
+
+                            ctx.lineTo(midX, midY);
+                        }
+                        ctx.lineTo(eX, eY);
+                        ctx.stroke();
+
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 1.5;
+                        ctx.stroke();
+                    }
+                }
+                ctx.restore();
+            }
+
+            drawUI(ctx, camera) {
+                ctx.save();
+                ctx.textAlign = 'center';
+                for (const dt of this.damageTexts) {
+                    const screenX = dt.x - camera.x;
+                    const screenY = dt.y - camera.y;
+
+                    ctx.globalAlpha = Math.max(0, dt.alpha);
+                    ctx.font = `900 ${dt.size}px 'Cinzel', sans-serif`;
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 5;
+                    ctx.fillStyle = dt.color;
+
+                    ctx.strokeText(dt.text, screenX, screenY);
+                    ctx.fillText(dt.text, screenX, screenY);
+                }
+                ctx.restore();
+            }
+        }
+
+        const effects = new ParticleSystem();
+    </script>
+
+    <!-- お宝フラッグシステム -->
+    <script>
+        class Flag {
+            constructor(id, name, x, y) {
+                this.id = id;
+                this.name = name;
+                this.x = x;
+                this.y = y;
+                this.team = 'neutral'; 
+                this.gauge = 0; 
+                this.maxGauge = 100; 
+                this.radius = FLAG_CAPTURE_RADIUS;
+                this.pulseTimer = 0;
+            }
+
+            update(entities) {
+                this.pulseTimer += 0.05;
+
+                let blueCount = 0;
+                let redCount = 0;
+                let blueHasDefender = false;
+                let redHasDefender = false;
+
+                let capturingBlueEntity = null;
+                let capturingRedEntity = null;
+
+                for (const entity of entities) {
+                    if (entity.isDead) continue;
+                    const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
+
+                    if (dist < this.radius) {
+                        entity.currentFlag = this; 
+
+                        if (entity.team === 'blue') {
+                            blueCount++;
+                            capturingBlueEntity = entity;
+                            if (entity.role === 'defender') blueHasDefender = true;
+                        } else {
+                            redCount++;
+                            capturingRedEntity = entity;
+                            if (entity.role === 'defender') redHasDefender = true;
+                        }
+                    }
+                }
+
+                // 奪取ロジック
+                if (blueCount > 0 && redCount === 0) {
+                    const runnerMult = (capturingBlueEntity.role === 'runner' || capturingBlueEntity.charId === 'gear5') ? 1.5 : 1.0;
+                    const boostMult = (blueBoostTimer > 0) ? 1.5 : 1.0;
+                    const captureSpeed = 0.22 * runnerMult * boostMult;
+
+                    if (this.team === 'red') {
+                        this.gauge -= captureSpeed * 2;
+                        if (this.gauge <= 0) {
+                            this.gauge = 0;
+                            this.team = 'neutral';
+                            this.maxGauge = 100;
+                            audio.playSFX('capture_start');
+                        }
+                    } else if (this.team === 'neutral') {
+                        capturingBlueEntity.isCapturingProgress = (this.gauge / 100); 
+                        this.gauge += captureSpeed;
+                        if (this.gauge >= 100) {
+                            this.gauge = 100;
+                            this.team = 'blue';
+                            this.maxGauge = blueHasDefender ? 150 : 100;
+                            audio.playSFX('capture_done');
+                            showGameNotification("お宝を確保！", "#3b82f6");
+
+                            if (capturingBlueEntity.role === 'runner' || capturingBlueEntity.charId === 'gear5') {
+                                capturingBlueEntity.speedBoostTimer = 300; 
+                                effects.spawnDamageText(capturingBlueEntity.x, capturingBlueEntity.y, "ゲッター特性：スピードアップ!", "#10b981", true);
+                            }
+
+                            accumulateBoost('blue', 20);
+
+                            if (capturingBlueEntity.isPlayer) {
+                                playerCaptures++;
+                                updateLiveStats();
+                            }
+                        }
+                    } else if (this.team === 'blue') {
+                        if (blueHasDefender) this.maxGauge = 150;
+                        if (this.gauge < this.maxGauge) {
+                            this.gauge = Math.min(this.maxGauge, this.gauge + captureSpeed * 0.8);
+                        }
+                    }
+                } else if (redCount > 0 && blueCount === 0) {
+                    const runnerMult = (capturingRedEntity.role === 'runner' || capturingRedEntity.charId === 'gear5') ? 1.5 : 1.0;
+                    const boostMult = (redBoostTimer > 0) ? 1.5 : 1.0;
+                    const captureSpeed = 0.22 * runnerMult * boostMult;
+
+                    if (this.team === 'blue') {
+                        this.gauge -= captureSpeed * 2;
+                        if (this.gauge <= 0) {
+                            this.gauge = 0;
+                            this.team = 'neutral';
+                            this.maxGauge = 100;
+                            audio.playSFX('capture_start');
+                        }
+                    } else if (this.team === 'neutral') {
+                        capturingRedEntity.isCapturingProgress = (this.gauge / 100);
+                        this.gauge += captureSpeed;
+                        if (this.gauge >= 100) {
+                            this.gauge = 100;
+                            this.team = 'red';
+                            this.maxGauge = redHasDefender ? 150 : 100;
+                            audio.playSFX('capture_done');
+                            showGameNotification("お宝を奪われた！", "#ef4444");
+
+                            if (capturingRedEntity.role === 'runner' || capturingRedEntity.charId === 'gear5') {
+                                capturingRedEntity.speedBoostTimer = 300;
+                            }
+
+                            accumulateBoost('red', 20);
+                        }
+                    } else if (this.team === 'red') {
+                        if (redHasDefender) this.maxGauge = 150;
+                        if (this.gauge < this.maxGauge) {
+                            this.gauge = Math.min(this.maxGauge, this.gauge + captureSpeed * 0.8);
+                        }
+                    }
+                }
+            }
+
+            draw(ctx, camera) {
+                const screenX = this.x - camera.x;
+                const screenY = this.y - camera.y;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
+                
+                let flagColor = 'rgba(245, 158, 11, 0.12)';
+                let strokeColor = 'rgba(245, 158, 11, 0.3)';
+                if (this.team === 'blue') {
+                    flagColor = 'rgba(59, 130, 246, 0.12)';
+                    strokeColor = 'rgba(59, 130, 246, 0.4)';
+                } else if (this.team === 'red') {
+                    flagColor = 'rgba(239, 68, 68, 0.12)';
+                    strokeColor = 'rgba(239, 68, 68, 0.4)';
+                }
+
+                ctx.fillStyle = flagColor;
+                ctx.fill();
+                ctx.lineWidth = 3 + Math.sin(this.pulseTimer) * 0.8;
+                ctx.strokeStyle = strokeColor;
+                ctx.stroke();
+
+                ctx.fillStyle = "#facc15";
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i * Math.PI / 3) + (this.pulseTimer * 0.2);
+                    const cx = screenX + Math.cos(angle) * 16;
+                    const cy = screenY + Math.sin(angle) * 16;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                const flagPoleH = 65;
+                ctx.strokeStyle = '#cbd5e1';
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.moveTo(screenX, screenY);
+                ctx.lineTo(screenX, screenY - flagPoleH);
+                ctx.stroke();
+
+                ctx.beginPath();
+                if (this.team === 'blue') ctx.fillStyle = '#2563eb';
+                else if (this.team === 'red') ctx.fillStyle = '#dc2626';
+                else ctx.fillStyle = '#d97706';
+
+                ctx.moveTo(screenX, screenY - flagPoleH);
+                ctx.lineTo(screenX + 32, screenY - flagPoleH + 11);
+                ctx.lineTo(screenX, screenY - flagPoleH + 22);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = '#fbbf24';
+                ctx.beginPath();
+                ctx.arc(screenX, screenY - flagPoleH, 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = "900 12px 'Inter', sans-serif";
+                ctx.textAlign = 'center';
+                const percent = Math.floor((this.gauge / this.maxGauge) * 100);
+                ctx.fillText(`エリア ${this.name} (${percent}%)`, screenX, screenY + 22);
+
+                if (this.maxGauge > 100) {
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.font = "bold 9px 'Inter', sans-serif";
+                    ctx.fillText('🛡️ お宝150%チャージ中 🛡️', screenX, screenY - flagPoleH - 10);
+                }
+
+                ctx.restore();
+            }
+        }
+
+        // 回復アイテム定義
+        class RecoveryItem {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 16;
+                this.pulseTimer = Math.random() * Math.PI;
+                this.isMeat = Math.random() > 0.4; 
+                this.isConsumed = false;
+            }
+
+            update(entities) {
+                this.pulseTimer += 0.05;
+
+                for (const entity of entities) {
+                    if (entity.isDead) continue;
+                    const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
+                    if (dist < entity.radius + this.radius) {
+                        this.isConsumed = true;
+                        entity.hp = Math.min(entity.maxHp, entity.hp + 400);
+                        effects.spawnHealSpark(this.x, this.y);
+                        effects.spawnDamageText(this.x, this.y, "+400 回復!", "#10b981", true);
+                        audio.playSFX('capture_done');
+                        break;
+                    }
+                }
+            }
+
+            draw(ctx, camera) {
+                const screenX = this.x - camera.x;
+                const screenY = this.y - camera.y;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, this.radius + Math.sin(this.pulseTimer) * 4, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(16, 185, 129, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.font = "20px 'Inter'";
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const emoji = this.isMeat ? "🍖" : "🥤";
+                ctx.fillText(emoji, screenX, screenY + Math.sin(this.pulseTimer) * 2);
+
+                ctx.restore();
+            }
+        }
+
+        const recoveryItems = [];
+    </script>
+
+    <!-- ステージギミックシステム -->
+    <script>
+        class StageGimmick {
+            constructor(type, x, y) {
+                this.type = type; 
+                this.x = x;
+                this.y = y;
+                this.radius = type === 'quicksand' ? 125 : (type === 'ice' ? 95 : 60);
+                this.timer = Math.random() * 200; 
+                this.windAngle = Math.random() * Math.PI * 2; 
+            }
+
+            update(entities) {
+                this.timer += 1;
+
+                if (this.type === 'quicksand') {
+                    for (const entity of entities) {
+                        if (entity.isDead) continue;
+                        const dx = this.x - entity.x;
+                        const dy = this.y - entity.y;
+                        const dist = Math.hypot(dx, dy);
+
+                        if (dist < this.radius) {
+                            entity.x += (dx / dist) * 0.16;
+                            entity.y += (dy / dist) * 0.16;
+                            entity.vx *= 0.8;
+                            entity.vy *= 0.8;
+                        }
+                    }
+                }
+                else if (this.type === 'wind') {
+                    const isBlowing = (Math.floor(this.timer / 150) % 2 === 0);
+                    if (isBlowing) {
+                        if (Math.floor(this.timer) % 300 === 0) {
+                            this.windAngle = Math.random() * Math.PI * 2; 
+                        }
+                        for (const entity of entities) {
+                            if (entity.isDead) continue;
+                            const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
+                            if (dist < this.radius * 1.5) {
+                                entity.x += Math.cos(this.windAngle) * 0.85;
+                                entity.y += Math.sin(this.windAngle) * 0.85;
+                                if (Math.random() < 0.08) {
+                                    effects.spawnDust(entity.x, entity.y, '#f59e0b');
+                                }
+                            }
+                        }
+                    }
+                }
+                else if (this.type === 'bubble') {
+                    for (const entity of entities) {
+                        if (entity.isDead) continue;
+                        const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
+
+                        if (dist < this.radius) {
+                            entity.speedBoostTimer = 240; 
+                            effects.spawnDust(entity.x, entity.y, '#2dd4bf');
+                        }
+                    }
+                }
+                else if (this.type === 'bounce_bubble') {
+                    for (const entity of entities) {
+                        if (entity.isDead) continue;
+                        const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
+                        if (dist < this.radius) {
+                            const angle = Math.atan2(entity.y - this.y, entity.x - this.x);
+                            entity.vx = Math.cos(angle) * 12;
+                            entity.vy = Math.sin(angle) * 12;
+                            entity.barrierTimer = 120; 
+                            effects.spawnDamageText(entity.x, entity.y, "バブルバリア!", "#2dd4bf", true);
+                            effects.spawnDust(entity.x, entity.y, '#ffffff');
+                        }
+                    }
+                }
+                else if (this.type === 'ice') {
+                    const freezeCycle = 300; 
+                    const warningTime = 80;  
+                    const currentStep = Math.floor(this.timer) % freezeCycle;
+
+                    if (currentStep >= freezeCycle - warningTime && currentStep < freezeCycle - 10) {
+                        this.isWarning = true;
+                        this.isFreezing = false;
+                    } else if (currentStep >= freezeCycle - 10) {
+                        this.isWarning = false;
+                        this.isFreezing = true;
+                        
+                        for (const entity of entities) {
+                            if (entity.isDead) continue;
+                            const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
+                            if (dist < this.radius) {
+                                entity.stunTimer = 90; 
+                                entity.hp = Math.max(1, entity.hp - 50); 
+                                effects.spawnDamageText(entity.x, entity.y, "氷結・スタン!", "#38bdf8", true);
+                                effects.spawnBlood(entity.x, entity.y, 4);
+                            }
+                        }
+                    } else {
+                        this.isWarning = false;
+                        this.isFreezing = false;
+                    }
+                }
+            }
+
+            draw(ctx, camera) {
+                const screenX = this.x - camera.x;
+                const screenY = this.y - camera.y;
+
+                ctx.save();
+                if (this.type === 'quicksand') {
+                    ctx.translate(screenX, screenY);
+                    ctx.rotate(this.timer * 0.012);
+                    const grad = ctx.createRadialGradient(0, 0, 10, 0, 0, this.radius);
+                    grad.addColorStop(0, 'rgba(69, 26, 3, 0.7)');
+                    grad.addColorStop(0.5, 'rgba(120, 53, 15, 0.4)');
+                    grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = 'rgba(245, 158, 11, 0.2)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius * 0.7, 0, Math.PI);
+                    ctx.stroke();
+                } 
+                else if (this.type === 'wind') {
+                    const isBlowing = (Math.floor(this.timer / 150) % 2 === 0);
+                    if (isBlowing) {
+                        ctx.translate(screenX, screenY);
+                        ctx.rotate(this.windAngle);
+                        const grad = ctx.createLinearGradient(-this.radius, 0, this.radius, 0);
+                        grad.addColorStop(0, 'rgba(245, 158, 11, 0)');
+                        grad.addColorStop(0.5, 'rgba(245, 158, 11, 0.15)');
+                        grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+                        ctx.fillStyle = grad;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                else if (this.type === 'bubble') {
+                    const pulse = Math.sin(this.timer * 0.05) * 6;
+                    const grad = ctx.createRadialGradient(screenX, screenY, 5, screenX, screenY, this.radius + pulse);
+                    grad.addColorStop(0, 'rgba(45, 212, 191, 0.4)');
+                    grad.addColorStop(0.6, 'rgba(17, 94, 89, 0.15)');
+                    grad.addColorStop(1, 'rgba(45, 212, 191, 0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, this.radius + pulse, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = 'rgba(45, 212, 191, 0.5)';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                }
+                else if (this.type === 'bounce_bubble') {
+                    const pulse = Math.cos(this.timer * 0.04) * 8;
+                    ctx.strokeStyle = 'rgba(14, 165, 233, 0.6)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, this.radius + pulse, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    ctx.fillStyle = 'rgba(14, 165, 233, 0.08)';
+                    ctx.fill();
+
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.font = "12px 'Inter'";
+                    ctx.textAlign = 'center';
+                    ctx.fillText("🛡️", screenX, screenY + 4);
+                }
+                else if (this.type === 'ice') {
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
+                    if (this.isFreezing) {
+                        ctx.fillStyle = 'rgba(56, 189, 248, 0.6)'; 
+                        ctx.strokeStyle = '#ffffff';
+                    } else if (this.isWarning) {
+                        ctx.fillStyle = 'rgba(239, 68, 68, 0.25)'; 
+                        ctx.strokeStyle = '#ef4444';
+                    } else {
+                        ctx.fillStyle = 'rgba(30, 58, 138, 0.3)'; 
+                        ctx.strokeStyle = 'rgba(147, 197, 253, 0.4)';
+                    }
+                    ctx.fill();
+                    ctx.lineWidth = this.isWarning ? 3.5 : 1.5;
+                    ctx.stroke();
+
+                    if (this.isWarning) {
+                        const warningCycle = 80;
+                        const currentStep = Math.floor(this.timer) % 300;
+                        const ratio = 1 - ((currentStep - (300 - warningCycle)) / warningCycle);
+                        ctx.beginPath();
+                        ctx.arc(screenX, screenY, this.radius * Math.max(0, ratio), 0, Math.PI * 2);
+                        ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.font = "14px 'Inter'";
+                    ctx.fillText("❄️", screenX, screenY + 4);
+                }
+                ctx.restore();
+            }
+        }
+
+        const stageGimmicks = [];
+    </script>
+
+    <!-- キャラクターEntityシステム -->
+    <script>
+        class GameEntity {
+            constructor(charId, team, x, y, isPlayer = false) {
+                const spec = CHARACTERS[charId] || CHARACTERS.luffy;
+                this.charId = charId;
+                this.name = spec.name;
+                this.title = spec.title;
+                this.role = spec.role;
+                this.team = team;
+                this.isPlayer = isPlayer;
+
+                this.x = x;
+                this.y = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.radius = 24;
+
+                this.maxHp = spec.maxHp;
+                this.hp = spec.maxHp;
+                this.attackPower = spec.attack;
+                this.defensePower = spec.defense;
+                this.speed = spec.speed;
+                this.captureSpeedMultiplier = spec.captureSpeedMultiplier || 1.0;
+                this.skills = spec.skills;
+
+                this.isDead = false;
+                this.respawnTimer = 0;
+
+                this.skill1Cooldown = 0;
+                this.skill2Cooldown = 0;
+                this.dodgeCooldown = 0;
+                this.dodgeActiveFrames = 0;
+
+                this.attackState = 0;
+                this.attackCooldown = 0;
+                this.comboStep = 0;
+
+                this.targetEntity = null;
+                this.targetFlag = null;
+                this.aiState = 'wander';
+                this.aiTimer = 0;
+
+                this.angle = 0;
+                this.stunTimer = 0; 
+                this.speedBoostTimer = 0; 
+                this.barrierTimer = 0; 
+
+                this.currentFlag = null; 
+                this.isCapturingProgress = 0; 
+            }
+
+            takeDamage(dmg, attacker) {
+                if (this.isDead || this.dodgeActiveFrames > 0) return;
+
+                let finalDmg = this.barrierTimer > 0 ? dmg * 0.5 : dmg;
+
+                if (attacker && attacker.role === 'attacker') {
+                    if (this.currentFlag && this.currentFlag.team === this.team) {
+                        finalDmg *= 1.30;
+                    }
+                }
+
+                accumulateBoost(this.team, Math.floor(finalDmg * 0.015));
+
+                const damageCalculated = Math.max(12, Math.floor(finalDmg * (110 / (100 + this.defensePower))));
+                this.hp -= damageCalculated;
+
+                if (this.isPlayer) {
+                    window.dispatchEvent(new CustomEvent('screenshake', { detail: { amt: 14 } }));
+                }
+
+                effects.spawnBlood(this.x, this.y, 8, Math.cos(this.angle), Math.sin(this.angle));
+                effects.spawnDamageText(this.x, this.y, damageCalculated, this.team === 'blue' ? '#f43f5e' : '#60a5fa', dmg > 240);
+
+                audio.playSFX('hit');
+
+                if (this.hp <= 0) {
+                    this.hp = 0;
+                    this.isDead = true;
+                    this.respawnTimer = 240; 
+                    effects.spawnBlood(this.x, this.y, 25);
+                    audio.playSFX('ko');
+
+                    showGameNotification(`${attacker.name} が ${this.name} をKO!`, attacker.team === 'blue' ? '#3b82f6' : '#ef4444');
+                    addKillLog(attacker.name, this.name, attacker.team === 'blue');
+
+                    accumulateBoost(attacker.team, 15);
+
+                    if (attacker.isPlayer) {
+                        playerKOs++;
+                        updateLiveStats();
+                    }
+                }
+            }
+
+            dodge() {
+                if (this.dodgeCooldown > 0 || this.isDead || this.stunTimer > 0) return;
+                this.dodgeCooldown = 120;
+                this.dodgeActiveFrames = 15;
+
+                const dashSp = this.speed * 3.2;
+                this.vx = Math.cos(this.angle) * dashSp;
+                this.vy = Math.sin(this.angle) * dashSp;
+
+                effects.spawnDust(this.x, this.y, '#38bdf8');
+            }
+
+            performMelee(entities) {
+                if (this.attackCooldown > 0 || this.isDead || this.stunTimer > 0) return;
+                
+                this.attackState = 1;
+                this.attackCooldown = 22; 
+                this.comboStep = (this.comboStep + 1) % 3;
+
+                audio.playSFX('slash');
+
+                const range = 85; 
+                const arcWidth = Math.PI / 1.3;
+
+                const slashColor = (this.charId === 'gear5' || this.charId === 'roger') ? '#facc15' : (this.team === 'blue' ? '#3b82f6' : '#ef4444');
+                effects.spawnSlashArc(this.x, this.y, this.angle, range, slashColor);
+
+                const isBoosted = (this.team === 'blue' && blueBoostTimer > 0) || (this.team === 'red' && redBoostTimer > 0);
+                const damageMultiplier = isBoosted ? 1.5 : 1.0;
+
+                for (const entity of entities) {
+                    if (entity.isDead || entity.team === this.team) continue;
+                    const dx = entity.x - this.x;
+                    const dy = entity.y - this.y;
+                    const dist = Math.hypot(dx, dy);
+
+                    if (dist < range) {
+                        const angleToTarget = Math.atan2(dy, dx);
+                        let angleDiff = angleToTarget - this.angle;
+                        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+
+                        if (Math.abs(angleDiff) < arcWidth) {
+                            entity.takeDamage((this.attackPower + this.comboStep * 15) * damageMultiplier, this);
+                        }
+                    }
+                }
+
+                for (let i = 0; i < 6; i++) {
+                    const sa = this.angle + (Math.random() - 0.5) * 1.4;
+                    effects.particles.push({
+                        type: 'spark',
+                        x: this.x + Math.cos(this.angle) * 35,
+                        y: this.y + Math.sin(this.angle) * 35,
+                        vx: Math.cos(sa) * 7,
+                        vy: Math.sin(sa) * 7,
+                        alpha: 1.0,
+                        size: 3.5,
+                        color: slashColor,
+                        decay: 0.05
+                    });
+                }
+            }
+
+            useSkill(skillKey, entities) {
+                if (this.isDead || this.stunTimer > 0) return;
+                const spec = CHARACTERS[this.charId] || CHARACTERS.luffy;
+                const skillDef = spec.skills[skillKey];
+
+                if (skillKey === 'skill1' && this.skill1Cooldown > 0) return;
+                if (skillKey === 'skill2' && this.skill2Cooldown > 0) return;
+
+                if (this.isPlayer) {
+                    showSkillCutIn(this.name, skillDef.name);
+                }
+
+                if (skillKey === 'skill1') this.skill1Cooldown = skillDef.cooldown / 16.66;
+                else this.skill2Cooldown = skillDef.cooldown / 16.66;
+
+                audio.playSFX('skill_activate');
+                
+                const isBoosted = (this.team === 'blue' && blueBoostTimer > 0) || (this.team === 'red' && redBoostTimer > 0);
+                const dmgMod = isBoosted ? 1.5 : 1.0;
+
+                // ギア5ルフィ（ニカ）の演出
+                if (this.charId === 'gear5') {
+                    if (skillKey === 'skill1') { // 神鳴り
+                        const reach = 350;
+                        const px = this.x + Math.cos(this.angle) * reach;
+                        const py = this.y + Math.sin(this.angle) * reach;
+
+                        effects.spawnLightning(this.x, this.y, px, py, "#22d3ee");
+                        effects.spawnSkillBlast(px, py, "#22d3ee", 1.8);
+
+                        for (const entity of entities) {
+                            if (entity.isDead || entity.team === this.team) continue;
+                            const d = distToSegment({x: entity.x, y: entity.y}, {x: this.x, y: this.y}, {x: px, y: py});
+                            if (d < 70) {
+                                entity.takeDamage(skillDef.damage * dmgMod, this);
+                                entity.stunTimer = 150; 
+                                effects.spawnDamageText(entity.x, entity.y, "神鳴り電撃スタン!", "#22d3ee", true);
+                            }
+                        }
+                    }
+                    else if (skillKey === 'skill2') { // 猿神銃 (バジュラン・ガン)
+                        const expRadius = 320;
+                        effects.spawnSkillBlast(this.x, this.y, "#f59e0b", 3.2);
+
+                        window.dispatchEvent(new CustomEvent('screenshake', { detail: { amt: 35 } }));
+
+                        for (const entity of entities) {
+                            if (entity.isDead || entity.team === this.team) continue;
+                            const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
+                            if (dist < expRadius) {
+                                entity.takeDamage(skillDef.damage * dmgMod, this);
+                                const angle = Math.atan2(entity.y - this.y, entity.x - this.x);
+                                entity.vx = Math.cos(angle) * 26;
+                                entity.vy = Math.sin(angle) * 26;
+                                entity.stunTimer = 60;
+                                effects.spawnDamageText(entity.x, entity.y, "猿神銃・限界突破!!", "#fbbf24", true);
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                // ロジャー（海賊王）の演出
+                if (this.charId === 'roger') {
+                    if (skillKey === 'skill1') { // 神避（かむさり）
+                        const reach = 400;
+                        const px = this.x + Math.cos(this.angle) * reach;
+                        const py = this.y + Math.sin(this.angle) * reach;
+
+                        effects.spawnLightning(this.x, this.y, px, py, "#ef4444");
+                        effects.spawnSkillBlast(px, py, "#7f1d1d", 2.2);
+
+                        for (const entity of entities) {
+                            if (entity.isDead || entity.team === this.team) continue;
+                            const d = distToSegment({x: entity.x, y: entity.y}, {x: this.x, y: this.y}, {x: px, y: py});
+                            if (d < 85) {
+                                entity.takeDamage(skillDef.damage * dmgMod, this);
+                                entity.stunTimer = 90;
+                                effects.spawnDamageText(entity.x, entity.y, "神避!!", "#dc2626", true);
+                            }
+                        }
+                    }
+                    else if (skillKey === 'skill2') { // 海賊王の覇気
+                        const expRadius = 280;
+                        effects.spawnSkillBlast(this.x, this.y, "#ef4444", 2.6);
+
+                        window.dispatchEvent(new CustomEvent('screenshake', { detail: { amt: 30 } }));
+
+                        for (const entity of entities) {
+                            if (entity.isDead || entity.team === this.team) continue;
+                            const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
+                            if (dist < expRadius) {
+                                entity.takeDamage(skillDef.damage * dmgMod, this);
+                                const angle = Math.atan2(entity.y - this.y, entity.x - this.x);
+                                entity.vx = Math.cos(angle) * 24;
+                                entity.vy = Math.sin(angle) * 24;
+                                entity.stunTimer = 120;
+                                effects.spawnDamageText(entity.x, entity.y, "海賊王の覇気!", "#991b1b", true);
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                // ティーチ（黒髭）の演出
+                if (this.charId === 'teach') {
+                    if (skillKey === 'skill1') { // 闇水 (くらみず)
+                        const absorbRange = 380;
+                        effects.spawnSkillBlast(this.x, this.y, "#581c87", 2.0);
+
+                        for (const entity of entities) {
+                            if (entity.isDead || entity.team === this.team) continue;
+                            const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
+                            if (dist < absorbRange) {
+                                // 敵を中心に引き寄せる
+                                const angle = Math.atan2(this.y - entity.y, this.x - entity.x);
+                                entity.x = this.x - Math.cos(angle) * 40;
+                                entity.y = this.y - Math.sin(angle) * 40;
+                                entity.takeDamage(skillDef.damage * dmgMod, this);
+                                entity.stunTimer = 120;
+                                effects.spawnDamageText(entity.x, entity.y, "闇に引きずり込まれる!", "#c084fc", true);
+                            }
+                        }
+                    }
+                    else if (skillKey === 'skill2') { // 震天動地 (グラグラの実)
+                        const expRadius = 340;
+                        effects.spawnSkillBlast(this.x, this.y, "#3b82f6", 2.8);
+
+                        window.dispatchEvent(new CustomEvent('screenshake', { detail: { amt: 35 } }));
+
+                        for (const entity of entities) {
+                            if (entity.isDead || entity.team === this.team) continue;
+                            const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
+                            if (dist < expRadius) {
+                                entity.takeDamage(skillDef.damage * dmgMod, this);
+                                const angle = Math.atan2(entity.y - this.y, entity.x - this.x);
+                                entity.vx = Math.cos(angle) * 25;
+                                entity.vy = Math.sin(angle) * 25;
+                                entity.stunTimer = 80;
+                                effects.spawnDamageText(entity.x, entity.y, "大震動!!", "#60a5fa", true);
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                effects.spawnSkillBlast(this.x, this.y, skillDef.color, 1.3);
+
+                // 標準スキルタイプ処理
+                if (skillDef.type === 'projectile') {
+                    const reach = 260;
+                    const px = this.x + Math.cos(this.angle) * reach;
+                    const py = this.y + Math.sin(this.angle) * reach;
+
+                    effects.spawnSlashArc(this.x, this.y, this.angle, reach * 0.7, skillDef.color);
+
+                    for (const entity of entities) {
+                        if (entity.isDead || entity.team === this.team) continue;
+                        const distToVector = distToSegment({x: entity.x, y: entity.y}, {x: this.x, y: this.y}, {x: px, y: py});
+                        if (distToVector < 45) {
+                            entity.takeDamage(skillDef.damage * dmgMod, this);
+                            entity.vx = Math.cos(this.angle) * 13;
+                            entity.vy = Math.sin(this.angle) * 13;
+                        }
+                    }
+
+                    for (let d = 0; d < reach; d += 15) {
+                        effects.spawnDust(this.x + Math.cos(this.angle) * d, this.y + Math.sin(this.angle) * d, skillDef.color);
+                    }
+                }
+                else if (skillDef.type === 'dash_aoe') {
+                    const dashDist = 200;
+                    this.x += Math.cos(this.angle) * dashDist;
+                    this.y += Math.sin(this.angle) * dashDist;
+                    keepInsideBoundaries(this);
+
+                    const expRadius = 180;
+                    for (const entity of entities) {
+                        if (entity.isDead || entity.team === this.team) continue;
+                        const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
+                        if (dist < expRadius) {
+                            entity.takeDamage(skillDef.damage * dmgMod, this);
+                            entity.vx = Math.cos(Math.atan2(entity.y - this.y, entity.x - this.x)) * 15;
+                            entity.vy = Math.sin(Math.atan2(entity.y - this.y, entity.x - this.x)) * 15;
+                        }
+                    }
+                    effects.spawnSkillBlast(this.x, this.y, '#f59e0b', 2.0);
+                }
+                else if (skillDef.type === 'dash_slash') {
+                    const dashDist = 220;
+                    const startX = this.x;
+                    const startY = this.y;
+
+                    this.x += Math.cos(this.angle) * dashDist;
+                    this.y += Math.sin(this.angle) * dashDist;
+                    keepInsideBoundaries(this);
+
+                    effects.spawnSlashArc(startX, startY, this.angle, dashDist, '#10b981');
+
+                    for (const entity of entities) {
+                        if (entity.isDead || entity.team === this.team) continue;
+                        const d = distToSegment({x: entity.x, y: entity.y}, {x: startX, y: startY}, {x: this.x, y: this.y});
+                        if (d < 60) {
+                            entity.takeDamage(skillDef.damage * dmgMod, this);
+                        }
+                    }
+
+                    for (let d = 0; d < dashDist; d += 12) {
+                        effects.spawnDust(startX + Math.cos(this.angle) * d, startY + Math.sin(this.angle) * d, '#10b981');
+                    }
+                }
+                else if (skillDef.type === 'spinning_slashes') {
+                    const spinRadius = 220; 
+                    for (const entity of entities) {
+                        if (entity.isDead || entity.team === this.team) continue;
+                        const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
+                        if (dist < spinRadius) {
+                            entity.takeDamage(skillDef.damage * dmgMod, this);
+                        }
+                    }
+                    for (let i = 0; i < 360; i += 45) {
+                        const rad = i * Math.PI / 180;
+                        effects.spawnSlashArc(this.x, this.y, rad, spinRadius * 0.7, '#059669');
+                    }
+                    for (let i = 0; i < 360; i += 12) {
+                        const rad = i * Math.PI / 180;
+                        effects.particles.push({
+                            type: 'spark',
+                            x: this.x + Math.cos(rad) * 95,
+                            y: this.y + Math.sin(rad) * 95,
+                            vx: Math.cos(rad) * 4,
+                            vy: Math.sin(rad) * 4,
+                            alpha: 1.0,
+                            size: 4,
+                            color: '#059669',
+                            decay: 0.04
+                        });
+                    }
+                }
+                else if (skillDef.type === 'room_teleport') {
+                    const roomRadius = 240;
+                    effects.particles.push({
+                        type: 'shockwave',
+                        x: this.x,
+                        y: this.y,
+                        radius: 5,
+                        maxRadius: roomRadius,
+                        alpha: 1.0,
+                        color: "#22d3ee",
+                        decay: 0.02
+                    });
+
+                    let target = null;
+                    let minDist = roomRadius;
+                    for (const entity of entities) {
+                        if (entity.isDead || entity.team === this.team) continue;
+                        const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            target = entity;
+                        }
+                    }
+
+                    if (target) {
+                        const warpAngle = target.angle + Math.PI; 
+                        this.x = target.x + Math.cos(warpAngle) * 45;
+                        this.y = target.y + Math.sin(warpAngle) * 45;
+                        this.angle = target.angle; 
+                        keepInsideBoundaries(this);
+
+                        target.takeDamage(skillDef.damage * dmgMod, this);
+                        target.stunTimer = 90; 
+                        effects.spawnDamageText(target.x, target.y, "シャンブルズ・気絶!", "#22d3ee", true);
+                        effects.spawnSkillBlast(target.x, target.y, "#06b6d4", 1.2);
+                    } else {
+                        this.x += Math.cos(this.angle) * 160;
+                        this.y += Math.sin(this.angle) * 160;
+                        keepInsideBoundaries(this);
+                    }
+                }
+                else if (skillDef.type === 'electric_slash') {
+                    const reach = 220;
+                    const px = this.x + Math.cos(this.angle) * reach;
+                    const py = this.y + Math.sin(this.angle) * reach;
+
+                    effects.spawnSlashArc(this.x, this.y, this.angle, reach * 0.8, '#22d3ee');
+
+                    for (const entity of entities) {
+                        if (entity.isDead || entity.team === this.team) continue;
+                        const distToVector = distToSegment({x: entity.x, y: entity.y}, {x: this.x, y: this.y}, {x: px, y: py});
+                        if (distToVector < 50) {
+                            entity.takeDamage(skillDef.damage * dmgMod, this);
+                            entity.stunTimer = 60; 
+                            effects.spawnDamageText(entity.x, entity.y, "切断・感電!", "#22d3ee", true);
+                        }
+                    }
+
+                    for (let d = 0; d < reach; d += 15) {
+                        effects.spawnDust(this.x + Math.cos(this.angle) * d, this.y + Math.sin(this.angle) * d, "#22d3ee");
+                    }
+                }
+                else if (skillDef.type === 'massive_wave') {
+                    const waveRange = 320;
+                    const endX = this.x + Math.cos(this.angle) * waveRange;
+                    const endY = this.y + Math.sin(this.angle) * waveRange;
+
+                    effects.spawnSlashArc(this.x, this.y, this.angle, waveRange * 0.7, '#ef4444');
+
+                    for (const entity of entities) {
+                        if (entity.isDead || entity.team === this.team) continue;
+                        const dist = distToSegment({x: entity.x, y: entity.y}, {x: this.x, y: this.y}, {x: endX, y: endY});
+                        if (dist < 65) {
+                            entity.takeDamage(skillDef.damage * dmgMod, this);
+                            entity.vx = Math.cos(this.angle) * 18;
+                            entity.vy = Math.sin(this.angle) * 18;
+                        }
+                    }
+
+                    for (let d = 0; d < waveRange; d += 25) {
+                        effects.spawnSkillBlast(this.x + Math.cos(this.angle) * d, this.y + Math.sin(this.angle) * d, '#ef4444', 0.65);
+                    }
+                }
+                else if (skillDef.type === 'haki_stun') {
+                    const hakiRadius = 260;
+                    for (const entity of entities) {
+                        if (entity.isDead || entity.team === this.team) continue;
+                        const dist = Math.hypot(entity.x - this.x, entity.y - this.y);
+                        if (dist < hakiRadius) {
+                            entity.takeDamage(skillDef.damage * dmgMod, this);
+                            entity.stunTimer = 120; 
+                            effects.spawnDamageText(entity.x, entity.y, "覇気・麻痺!", "#7c3aed", true);
+                        }
+                    }
+                    effects.spawnSkillBlast(this.x, this.y, '#7c3aed', 2.6);
+                }
+                else if (skillDef.type === 'heavy_knockback') {
+                    const swingX = this.x + Math.cos(this.angle) * 130;
+                    const swingY = this.y + Math.sin(this.angle) * 130;
+
+                    for (const entity of entities) {
+                        if (entity.isDead || entity.team === this.team) continue;
+                        const dist = Math.hypot(entity.x - swingX, entity.y - swingY);
+                        if (dist < 100) {
+                            entity.takeDamage(skillDef.damage * dmgMod, this);
+                            const dx = entity.x - this.x;
+                            const dy = entity.y - this.y;
+                            const h = Math.hypot(dx, dy) || 1;
+                            entity.vx = (dx / h) * 24;
+                            entity.vy = (dy / h) * 24;
+                        }
+                    }
+                    effects.spawnSkillBlast(swingX, swingY, '#6366f1', 1.6);
+                }
+                else if (skillDef.type === 'fire_beam') {
+                    const beamLen = 420;
+                    const bx = this.x + Math.cos(this.angle) * beamLen;
+                    const by = this.y + Math.sin(this.angle) * beamLen;
+
+                    for (const entity of entities) {
+                        if (entity.isDead || entity.team === this.team) continue;
+                        const dist = distToSegment({x: entity.x, y: entity.y}, {x: this.x, y: this.y}, {x: bx, y: by});
+                        if (dist < 55) {
+                            entity.takeDamage(skillDef.damage * dmgMod, this);
+                        }
+                    }
+
+                    for (let d = 0; d < beamLen; d += 15) {
+                        effects.spawnDust(this.x + Math.cos(this.angle) * d, this.y + Math.sin(this.angle) * d, '#f97316');
+                    }
+                }
+                else if (skillDef.type === 'ice_breath') {
+                    const beamLen = 250;
+                    const bx = this.x + Math.cos(this.angle) * beamLen;
+                    const by = this.y + Math.sin(this.angle) * beamLen;
+
+                    effects.spawnSlashArc(this.x, this.y, this.angle, beamLen * 0.7, '#34d399');
+
+                    for (const entity of entities) {
+                        if (entity.isDead || entity.team === this.team) continue;
+                        const dist = distToSegment({x: entity.x, y: entity.y}, {x: this.x, y: this.y}, {x: bx, y: by});
+                        if (dist < 45) {
+                            entity.takeDamage(skillDef.damage * dmgMod, this);
+                            entity.stunTimer = 90; 
+                            effects.spawnDamageText(entity.x, entity.y, "氷結凍結!", "#34d399", true);
+                        }
+                    }
+
+                    for (let d = 0; d < beamLen; d += 15) {
+                        effects.spawnDust(this.x + Math.cos(this.angle) * d, this.y + Math.sin(this.angle) * d, '#a7f3d0');
+                    }
+                }
+                else if (skillDef.type === 'ice_breath') {
+                    // 通常のアイスブレス処理
+                }
+            }
+
+            update(entities, flags) {
+                if (this.isDead) {
+                    this.respawnTimer--;
+                    if (this.respawnTimer <= 0) {
+                        this.isDead = false;
+                        this.hp = this.maxHp;
+                        if (this.team === 'blue') {
+                            this.x = 150 + Math.random() * 100;
+                            this.y = WORLD_SIZE / 2 + (Math.random() - 0.5) * 120;
+                        } else {
+                            this.x = WORLD_SIZE - 150 - Math.random() * 100;
+                            this.y = WORLD_SIZE / 2 + (Math.random() - 0.5) * 120;
+                        }
+                        this.vx = 0;
+                        this.vy = 0;
+                        this.stunTimer = 0;
+                        this.speedBoostTimer = 0;
+                        this.barrierTimer = 0;
+                    }
+                    return;
+                }
+
+                this.currentFlag = null;
+                this.isCapturingProgress = 0;
+
+                // 常時：ニカ（ギア5ルフィ）の白き羽衣スチームリボン
+                if (this.charId === 'gear5') {
+                    if (Math.random() < 0.2) {
+                        const cloudAngle = (Date.now() * 0.008) + (Math.random() * 0.5);
+                        effects.particles.push({
+                            type: 'dust',
+                            x: this.x + Math.cos(cloudAngle) * 28,
+                            y: this.y + Math.sin(cloudAngle) * 28,
+                            vx: (Math.random() - 0.5) * 0.5,
+                            vy: (Math.random() - 0.5) * 0.5,
+                            alpha: 0.85,
+                            size: 4 + Math.random() * 6,
+                            color: '#ffffff', 
+                            decay: 0.02
+                        });
+                    }
+                }
+
+                // 常時：ロジャー（海賊王）の漆黒・赤の覇王色の覇気
+                if (this.charId === 'roger') {
+                    if (Math.random() < 0.15) {
+                        effects.particles.push({
+                            type: 'spark',
+                            x: this.x + (Math.random() - 0.5) * 40,
+                            y: this.y + (Math.random() - 0.5) * 40,
+                            vx: (Math.random() - 0.5) * 1,
+                            vy: (Math.random() - 0.5) * 1,
+                            alpha: 0.9,
+                            size: 2 + Math.random() * 3,
+                            color: Math.random() > 0.5 ? '#7f1d1d' : '#000000',
+                            decay: 0.03
+                        });
+                    }
+                }
+
+                // 常時：ティーチ（黒髭）の重力闇オーラ
+                if (this.charId === 'teach') {
+                    if (Math.random() < 0.2) {
+                        effects.particles.push({
+                            type: 'dust',
+                            x: this.x + (Math.random() - 0.5) * 45,
+                            y: this.y + (Math.random() - 0.5) * 45,
+                            vx: (Math.random() - 0.5) * 0.5,
+                            vy: -0.5 - Math.random() * 0.5,
+                            alpha: 0.8,
+                            size: 3 + Math.random() * 5,
+                            color: '#3b0764', 
+                            decay: 0.025
+                        });
+                    }
+                }
+
+                // スタン処理
+                if (this.stunTimer > 0) {
+                    this.stunTimer--;
+                    this.vx *= 0.7;
+                    this.vy *= 0.7;
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    keepInsideBoundaries(this);
+                    if (Math.random() < 0.1) {
+                        effects.spawnDust(this.x, this.y - 10, "#38bdf8");
+                    }
+                    return;
+                }
+
+                const isBoostActive = (this.team === 'blue' && blueBoostTimer > 0) || (this.team === 'red' && redBoostTimer > 0);
+                
+                if (isBoostActive) {
+                    if (Math.floor(Date.now() / 16) % 15 === 0) {
+                        this.hp = Math.min(this.maxHp, this.hp + 20); 
+                    }
+                    effects.spawnBoostAura(this.x, this.y);
+                }
+
+                let currentSpeed = this.speed;
+                if (isBoostActive) {
+                    currentSpeed *= 1.3; 
+                }
+                if (this.speedBoostTimer > 0) {
+                    this.speedBoostTimer--;
+                    currentSpeed *= 1.5; 
+                }
+
+                if (this.barrierTimer > 0) {
+                    this.barrierTimer--;
+                    if (Math.random() < 0.12) {
+                        effects.spawnDust(this.x, this.y, '#0ea5e9');
+                    }
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                if (activeStage === STAGES.marineford) {
+                    this.vx *= 0.94;
+                    this.vy *= 0.94;
+                } else {
+                    this.vx *= 0.85;
+                    this.vy *= 0.85;
+                }
+
+                if (this.skill1Cooldown > 0) this.skill1Cooldown--;
+                if (this.skill2Cooldown > 0) this.skill2Cooldown--;
+                if (this.dodgeCooldown > 0) this.dodgeCooldown--;
+                if (this.dodgeActiveFrames > 0) this.dodgeActiveFrames--;
+                if (this.attackCooldown > 0) this.attackCooldown--;
+
+                keepInsideBoundaries(this);
+
+                if (this.role === 'defender') {
+                    for (const f of flags) {
+                        if (f.team === this.team && Math.hypot(this.x - f.x, this.y - f.y) < f.radius) {
+                            this.defensePower = CHARACTERS[this.charId].defense * 1.5;
+                            effects.spawnDust(this.x, this.y, "#3b82f6"); 
+                            break;
+                        } else {
+                            this.defensePower = CHARACTERS[this.charId].defense;
+                        }
+                    }
+                }
+
+                if (!this.isPlayer) {
+                    this.runAI(entities, flags);
+                }
+            }
+
+            draw(ctx, camera) {
+                if (this.isDead) return;
+
+                const screenX = this.x - camera.x;
+                const screenY = this.y - camera.y;
+
+                ctx.save();
+                
+                if (this.dodgeActiveFrames > 0) {
+                    ctx.fillStyle = 'rgba(56, 189, 248, 0.4)';
+                    ctx.beginPath();
+                    ctx.arc(screenX - this.vx, screenY - this.vy, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                if (this.speedBoostTimer > 0) {
+                    ctx.strokeStyle = 'rgba(45, 212, 191, 0.5)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, this.radius + 6, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                if (this.barrierTimer > 0) {
+                    ctx.strokeStyle = 'rgba(14, 165, 233, 0.7)';
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, this.radius + 5, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                ctx.beginPath();
+                ctx.arc(screenX, screenY + 5, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.team === 'blue' ? 'rgba(59, 130, 246, 0.35)' : 'rgba(239, 68, 68, 0.35)';
+                ctx.fill();
+
+                ctx.translate(screenX, screenY);
+                ctx.rotate(this.angle);
+
+                const charSpec = CHARACTERS[this.charId];
+                if (charSpec && charSpec.img && charSpec.img.complete) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                    ctx.clip();
+                    
+                    ctx.fillStyle = this.team === 'blue' ? '#0f172a' : '#1e1b4b';
+                    ctx.fill();
+
+                    ctx.drawImage(charSpec.img, -this.radius, -this.radius, this.radius * 2, this.radius * 2);
+                    ctx.restore();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = this.team === 'blue' ? '#2563eb' : '#dc2626';
+                    ctx.fill();
+                }
+
+                // ネオンオーラリング
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.lineWidth = 3.5;
+                if (charSpec.isExtreme) {
+                    ctx.strokeStyle = '#facc15'; 
+                    ctx.shadowColor = '#fbbf24';
+                    ctx.shadowBlur = 12;
+                } else if (this.isPlayer) {
+                    ctx.strokeStyle = '#fbbf24'; 
+                    ctx.shadowColor = '#fbbf24';
+                    ctx.shadowBlur = 10;
+                } else {
+                    ctx.strokeStyle = this.team === 'blue' ? '#60a5fa' : '#f87171'; 
+                    ctx.shadowColor = this.team === 'blue' ? '#3b82f6' : '#ef4444';
+                    ctx.shadowBlur = 6;
+                }
+                ctx.stroke();
+                ctx.shadowBlur = 0; 
+
+                ctx.beginPath();
+                ctx.moveTo(this.radius - 2, -6);
+                ctx.lineTo(this.radius + 10, 0);
+                ctx.lineTo(this.radius - 2, 6);
+                ctx.closePath();
+                ctx.fillStyle = this.isPlayer ? '#fbbf24' : '#ffffff';
+                ctx.fill();
+
+                ctx.rotate(-this.angle);
+                ctx.restore();
+
+                if (this.stunTimer > 0) {
+                    ctx.fillStyle = "#facc15";
+                    const angleOffset = (Date.now() * 0.005);
+                    const sx = screenX + Math.cos(angleOffset) * 15;
+                    const sy = screenY - this.radius - 28 + Math.sin(angleOffset) * 4;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 3.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.save();
+                const hpBarW = 46;
+                const hpBarH = 6;
+                const hpX = screenX - hpBarW / 2;
+                const hpY = screenY - this.radius - 12;
+
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+                ctx.fillRect(hpX, hpY, hpBarW, hpBarH);
+
+                const hpRatio = this.hp / this.maxHp;
+                ctx.fillStyle = this.team === 'blue' ? '#10b981' : '#ef4444';
+                ctx.fillRect(hpX, hpY, hpBarW * hpRatio, hpBarH);
+
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(hpX, hpY, hpBarW, hpBarH);
+
+                let roleEmoji = "⚔️";
+                if (this.role === "runner") roleEmoji = "🏃";
+                else if (this.role === "defender") roleEmoji = "🛡️";
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = "bold 9px 'Inter', sans-serif";
+                ctx.textAlign = 'center';
+                ctx.fillText(`${roleEmoji} ${this.name}`, screenX, screenY - this.radius - 20);
+
+                if (this.isCapturingProgress > 0) {
+                    const progressRadius = 14;
+                    ctx.strokeStyle = 'rgba(15, 23, 42, 0.7)';
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY - this.radius - 38, progressRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    ctx.strokeStyle = '#facc15';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY - this.radius - 38, progressRadius, -Math.PI / 2, (-Math.PI / 2) + (Math.PI * 2 * this.isCapturingProgress));
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = "900 7px 'Inter', sans-serif";
+                    ctx.fillText("CAPTURING", screenX, screenY - this.radius - 35);
+                }
+
+                ctx.restore();
+            }
+        }
+    </script>
+
+    <!-- AIロジック & ヘルパー関数 -->
+    <script>
+        function accumulateBoost(team, amount) {
+            if (team === 'blue') {
+                if (blueBoostTimer > 0) return; 
+                blueBoostGauge = Math.min(100, blueBoostGauge + amount);
+                document.getElementById('blue-boost-bar').style.width = `${blueBoostGauge}%`;
+                document.getElementById('blue-boost-text').innerText = `${Math.floor(blueBoostGauge)}%`;
+
+                if (blueBoostGauge >= 100) {
+                    triggerTeamBoost('blue');
+                }
+            } else {
+                if (redBoostTimer > 0) return;
+                redBoostGauge = Math.min(100, redBoostGauge + amount);
+                document.getElementById('red-boost-bar').style.width = `${redBoostGauge}%`;
+                document.getElementById('red-boost-text').innerText = `${Math.floor(redBoostGauge)}%`;
+
+                if (redBoostGauge >= 100) {
+                    triggerTeamBoost('red');
+                }
+            }
+        }
+
+        function triggerTeamBoost(team) {
+            audio.playSFX('team_boost');
+            window.dispatchEvent(new CustomEvent('screenshake', { detail: { amt: 25 } }));
+
+            const overlay = document.getElementById('boost-overlay');
+            const announcer = document.getElementById('boost-announcer');
+            const teamText = document.getElementById('boost-announcer-team');
+
+            if (team === 'blue') {
+                blueBoostGauge = 0;
+                blueBoostTimer = 720; 
+                teamText.innerText = "味方チームブースト！";
+                overlay.className = "absolute inset-0 pointer-events-none z-35 transition-all duration-300 boost-active-blue";
+            } else {
+                redBoostGauge = 0;
+                redBoostTimer = 720;
+                teamText.innerText = "敵チームブースト！";
+                overlay.className = "absolute inset-0 pointer-events-none z-35 transition-all duration-300 boost-active-red";
+            }
+
+            announcer.classList.remove('scale-0');
+            announcer.classList.add('scale-100');
+
+            setTimeout(() => {
+                announcer.classList.remove('scale-100');
+                announcer.classList.add('scale-0');
+            }, 2500);
+        }
+
+        GameEntity.prototype.runAI = function(entities, flags) {
+            this.aiTimer--;
+
+            if (this.aiTimer <= 0) {
+                this.aiTimer = 45 + Math.random() * 40;
+
+                let bestFlag = null;
+                let bestDist = Infinity;
+
+                for (const f of flags) {
+                    if (this.role === 'defender' && f.team === this.team && f.gauge < f.maxGauge) {
+                        const dist = Math.hypot(f.x - this.x, f.y - this.y);
+                        if (dist < bestDist) {
+                            bestDist = dist;
+                            bestFlag = f;
+                        }
+                    } else if (f.team !== this.team) {
+                        const dist = Math.hypot(f.x - this.x, f.y - this.y);
+                        if (dist < bestDist) {
+                            bestDist = dist;
+                            bestFlag = f;
+                        }
+                    }
+                }
+
+                if (!bestFlag && flags.length > 0) {
+                    bestFlag = flags[Math.floor(Math.random() * flags.length)];
+                }
+
+                this.targetFlag = bestFlag;
+
+                let bestEnemy = null;
+                let bestEnemyDist = 280; 
+
+                for (const e of entities) {
+                    if (e.isDead || e.team === this.team) continue;
+                    const dist = Math.hypot(e.x - this.x, e.y - this.y);
+                    if (dist < bestEnemyDist) {
+                        bestEnemyDist = dist;
+                        bestEnemy = e;
+                    }
+                }
+
+                this.targetEntity = bestEnemy;
+
+                if (this.targetEntity && (this.role === 'attacker' ? Math.random() > 0.35 : Math.random() > 0.65)) {
+                    this.aiState = 'attack';
+                } else if (this.targetFlag) {
+                    this.aiState = 'capture';
+                } else {
+                    this.aiState = 'wander';
+                }
+            }
+
+            if (this.aiState === 'attack' && this.targetEntity) {
+                const dx = this.targetEntity.x - this.x;
+                const dy = this.targetEntity.y - this.y;
+                this.angle = Math.atan2(dy, dx);
+
+                this.vx += Math.cos(this.angle) * this.speed * 0.13;
+                this.vy += Math.sin(this.angle) * this.speed * 0.13;
+
+                const dist = Math.hypot(dx, dy);
+                if (dist < 65) {
+                    this.performMelee(entities);
+                } else if (dist < 210 && Math.random() < 0.05) {
+                    this.useSkill('skill1', entities);
+                } else if (dist < 160 && Math.random() < 0.03) {
+                    this.useSkill('skill2', entities);
+                }
+            } else if (this.aiState === 'capture' && this.targetFlag) {
+                const dx = this.targetFlag.x - this.x;
+                const dy = this.targetFlag.y - this.y;
+                this.angle = Math.atan2(dy, dx);
+
+                const dist = Math.hypot(dx, dy);
+                if (dist > 35) {
+                    this.vx += Math.cos(this.angle) * this.speed * 0.13;
+                    this.vy += Math.sin(this.angle) * this.speed * 0.13;
+                    if (Math.random() < 0.02) {
+                        effects.spawnDust(this.x, this.y, '#64748b');
+                    }
+                }
+            } else {
+                this.vx += Math.cos(this.angle) * this.speed * 0.05;
+                this.vy += Math.sin(this.angle) * this.speed * 0.05;
+                if (Math.random() < 0.05) {
+                    this.angle += (Math.random() - 0.5) * 1.6;
+                }
+            }
+        };
+
+        function drawMinimap(ctx, entities, flags) {
+            const size = 128; 
+            ctx.clearRect(0, 0, size, size);
+            ctx.fillStyle = 'rgba(6, 9, 19, 0.9)';
+            ctx.fillRect(0, 0, size, size);
+
+            const toMini = (val) => (val / WORLD_SIZE) * size;
+
+            ctx.fillStyle = 'rgba(71, 85, 105, 0.4)';
+            for (const obs of OBSTACLES) {
+                ctx.fillRect(toMini(obs.x), toMini(obs.y), toMini(obs.w), toMini(obs.h));
+            }
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            for (const f of flags) {
+                const fx = toMini(f.x);
+                const fy = toMini(f.y);
+
+                ctx.beginPath();
+                ctx.arc(fx, fy, 8, 0, Math.PI * 2);
+                if (f.team === 'blue') ctx.fillStyle = 'rgba(59, 130, 246, 0.25)';
+                else if (f.team === 'red') ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
+                else ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(fx, fy, 4, 0, Math.PI * 2);
+                if (f.team === 'blue') ctx.fillStyle = '#3b82f6';
+                else if (f.team === 'red') ctx.fillStyle = '#ef4444';
+                else ctx.fillStyle = '#f59e0b';
+                ctx.fill();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = "900 8px 'Inter', sans-serif";
+                ctx.fillText(f.name, fx, fy - 11);
+            }
+
+            for (const e of entities) {
+                if (e.isDead) continue;
+                const ex = toMini(e.x);
+                const ey = toMini(e.y);
+
+                if (e.isPlayer) {
+                    ctx.save();
+                    ctx.translate(ex, ey);
+                    ctx.rotate(e.angle);
+                    ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.arc(0, 0, 18, -Math.PI / 5, Math.PI / 5);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+
+                    const pulse = 4.5 + Math.sin(Date.now() * 0.01) * 1.5;
+                    ctx.beginPath();
+                    ctx.arc(ex, ey, pulse, 0, Math.PI * 2);
+                    ctx.fillStyle = '#10b981';
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(ex, ey, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = e.team === 'blue' ? '#60a5fa' : '#f87171';
+                    ctx.fill();
+                }
+            }
+        }
+
+        function distToSegment(p, v, w) {
+            const l2 = dist2(v, w);
+            if (l2 === 0) return dist2(p, v);
+            let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            return Math.sqrt(dist2(p, { x: v.x + t * (w.x - v.x), y: v.y + t * (w.y - v.y) }));
+        }
+
+        function dist2(v, w) {
+            return (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
+        }
+
+        function keepInsideBoundaries(entity) {
+            if (entity.x < entity.radius) entity.x = entity.radius;
+            if (entity.x > WORLD_SIZE - entity.radius) entity.x = WORLD_SIZE - entity.radius;
+            if (entity.y < entity.radius) entity.y = entity.radius;
+            if (entity.y > WORLD_SIZE - entity.radius) entity.y = WORLD_SIZE - entity.radius;
+
+            for (const obs of OBSTACLES) {
+                if (entity.x + entity.radius > obs.x && entity.x - entity.radius < obs.x + obs.w &&
+                    entity.y + entity.radius > obs.y && entity.y - entity.radius < obs.y + obs.h) {
+                    
+                    const distL = Math.abs((entity.x + entity.radius) - obs.x);
+                    const distR = Math.abs((entity.x - entity.radius) - (obs.x + obs.w));
+                    const distT = Math.abs((entity.y + entity.radius) - obs.y);
+                    const distB = Math.abs((entity.y - entity.radius) - (obs.y + obs.h));
+
+                    const minDist = Math.min(distL, distR, distT, distB);
+                    if (minDist === distL) entity.x = obs.x - entity.radius;
+                    else if (minDist === distR) entity.x = obs.x + obs.w + entity.radius;
+                    else if (minDist === distT) entity.y = obs.y - entity.radius;
+                    else if (minDist === distB) entity.y = obs.y + obs.h + entity.radius;
+                }
+            }
+        }
+    </script>
+
+    <!-- コントローラー・インプット連携 -->
+    <script>
+        const keys = {};
+        let joystickActive = false;
+        let joystickTouchId = null; 
+        let joystickStart = { x: 0, y: 0 };
+        let joystickCurrent = { x: 0, y: 0 };
+
+        function isTouchDevice() {
+            return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        }
+
+        function updateControlLayout() {
+            const joystick = document.getElementById('joystick-container');
+            if (isTouchDevice()) {
+                joystick.style.display = 'flex';
+            } else {
+                joystick.style.display = 'none';
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            
+            if (e.key.toLowerCase() === 'e') triggerPlayerSkill('skill1');
+            if (e.key.toLowerCase() === 'q') triggerPlayerSkill('skill2');
+            if (e.key.toLowerCase() === 'shift') triggerPlayerDodge();
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        const jContainer = document.getElementById('joystick-container');
+        const jKnob = document.getElementById('joystick-knob');
+
+        jContainer.addEventListener('touchstart', (e) => {
+            if (joystickTouchId !== null) return; 
+            const touch = e.changedTouches[0];
+            joystickTouchId = touch.identifier;
+            joystickActive = true;
+            
+            const rect = jContainer.getBoundingClientRect();
+            joystickStart = {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2
+            };
+            handleJoystickMove(touch.clientX, touch.clientY);
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!joystickActive || joystickTouchId === null) return;
+            for (let i = 0; i < e.touches.length; i++) {
+                if (e.touches[i].identifier === joystickTouchId) {
+                    handleJoystickMove(e.touches[i].clientX, e.touches[i].clientY);
+                    e.preventDefault(); 
+                    break;
+                }
+            }
+        }, { passive: false });
+
+        const endJoystickTouch = (e) => {
+            if (!joystickActive || joystickTouchId === null) return;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joystickTouchId) {
+                    joystickActive = false;
+                    joystickTouchId = null;
+                    jKnob.style.transform = 'translate(0px, 0px)';
+                    joystickCurrent = { x: 0, y: 0 };
+                    break;
+                }
+            }
+        };
+
+        window.addEventListener('touchend', endJoystickTouch);
+        window.addEventListener('touchcancel', endJoystickTouch);
+
+        function handleJoystickMove(clientX, clientY) {
+            const dx = clientX - joystickStart.x;
+            const dy = clientY - joystickStart.y;
+            const dist = Math.hypot(dx, dy);
+            const maxRadius = 45;
+
+            const angle = Math.atan2(dy, dx);
+            const moveX = Math.cos(angle) * Math.min(dist, maxRadius);
+            const moveY = Math.sin(angle) * Math.min(dist, maxRadius);
+
+            jKnob.style.transform = `translate(${moveX}px, ${moveY}px)`;
+
+            joystickCurrent = {
+                x: moveX / maxRadius,
+                y: moveY / maxRadius
+            };
+        }
+
+        function setupTouchControls() {
+            const btnAttack = document.getElementById('btn-attack');
+            const btnSkill1 = document.getElementById('btn-skill1');
+            const btnSkill2 = document.getElementById('btn-skill2');
+            const btnDodge = document.getElementById('btn-dodge');
+
+            btnAttack.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (player) player.performMelee(entities);
+            });
+            btnSkill1.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                triggerPlayerSkill('skill1');
+            });
+            btnSkill2.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                triggerPlayerSkill('skill2');
+            });
+            btnDodge.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                triggerPlayerDodge();
+            });
+        }
+    </script>
+
+    <!-- ガシャ(スカウト)機能の制御処理 -->
+    <script>
+        // ダイヤ表示更新
+        function updateDiamondsDisplay() {
+            document.getElementById('menu-diamonds').innerText = playerDiamonds;
+            document.getElementById('char-diamonds').innerText = playerDiamonds;
+            document.getElementById('gasha-diamonds').innerText = playerDiamonds;
+        }
+
+        // ガシャ画面へ遷移
+        document.getElementById('btn-to-gasha').addEventListener('click', () => {
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('gasha-screen').classList.remove('hidden');
+            updateDiamondsDisplay();
+        });
+
+        document.getElementById('btn-back-to-menu-from-gasha').addEventListener('click', () => {
+            document.getElementById('gasha-screen').classList.add('hidden');
+            document.getElementById('menu-screen').classList.remove('hidden');
+            updateDiamondsDisplay();
+        });
+
+        // 無料ダイヤチャージ
+        document.getElementById('btn-free-diamonds').addEventListener('click', () => {
+            playerDiamonds += 100;
+            updateDiamondsDisplay();
+            audio.playSFX('capture_done');
+            showGameNotification("ダイヤ 100個 をチャージしました！", "#10b981");
+        });
+
+        document.getElementById('btn-gasha-single').addEventListener('click', () => executeScout(1));
+        document.getElementById('btn-gasha-multi').addEventListener('click', () => executeScout(10));
+
+        let scoutResults = [];
+        let pullButtonListener = null;
+
+        function executeScout(count) {
+            const cost = count === 10 ? 50 : 5;
+            if (playerDiamonds < cost) {
+                showGameNotification("ダイヤが不足しています！無料チャージしてください。", "#ef4444");
+                audio.playSFX('hit');
+                return;
+            }
+
+            playerDiamonds -= cost;
+            updateDiamondsDisplay();
+
+            scoutResults = [];
+
+            for (let i = 0; i < count; i++) {
+                const rand = Math.random() * 100;
+                let rolledKey = 'luffy';
+
+                if (rand < 2.5) { // ギア5確率: 2.5% (超フェス)
+                    rolledKey = 'gear5';
+                } else if (rand < 5.0) { // ロジャー確率: 2.5% (超フェス)
+                    rolledKey = 'roger';
+                } else if (rand < 7.5) { // 黒髭確率: 2.5% (超フェス)
+                    rolledKey = 'teach';
+                } else if (rand < 22) { // ヤマト
+                    rolledKey = 'yamato';
+                } else if (rand < 38) { // カイドウ
+                    rolledKey = 'kaido';
+                } else if (rand < 54) { // シャンクス
+                    rolledKey = 'shanks';
+                } else if (rand < 70) { // ロー
+                    rolledKey = 'law';
+                } else if (rand < 85) { // ゾロ
+                    rolledKey = 'zoro';
+                } else {
+                    rolledKey = 'luffy';
+                }
+                scoutResults.push(rolledKey);
+            }
+
+            // ガシャ演出オーバーレイ起動
+            const overlay = document.getElementById('gasha-production-overlay');
+            overlay.classList.remove('hidden');
+
+            const prodFlag = document.getElementById('gasha-prod-flag');
+            const prodFlagIcon = document.getElementById('gasha-prod-flag-icon');
+            const prodTitle = document.getElementById('gasha-scout-title');
+            const pullButton = document.getElementById('btn-gasha-pull');
+
+            pullButton.classList.add('hidden');
+            prodTitle.innerText = "SCOUT IN PROGRESS...";
+            prodFlag.className = "absolute inset-0 flex items-center justify-center opacity-70 scale-100";
+            prodFlagIcon.className = "fa-solid fa-flag text-blue-500 text-8xl drop-shadow-[0_0_20px_rgba(59,130,246,0.6)]";
+
+            audio.playSFX('gasha_scout');
+
+            setTimeout(() => {
+                let hasExtreme = scoutResults.includes('gear5') || scoutResults.includes('roger') || scoutResults.includes('teach');
+                let hasPickUp = scoutResults.includes('yamato') || scoutResults.includes('kaido') || scoutResults.includes('shanks');
+
+                if (hasExtreme) {
+                    prodFlagIcon.className = "fa-solid fa-flag text-fuchsia-400 text-9xl animate-ping";
+                    prodFlag.className = "absolute inset-0 flex items-center justify-center opacity-90 scale-110";
+                    prodTitle.innerText = "🚨 EXTREME CHARACTER DETECTED!! 🚨";
+                    effects.spawnSkillBlast(window.innerWidth / 2, window.innerHeight / 2, '#ec4899', 2.0);
+                } else if (hasPickUp) {
+                    prodFlagIcon.className = "fa-solid fa-flag text-yellow-400 text-9xl animate-bounce";
+                    prodFlag.className = "absolute inset-0 flex items-center justify-center opacity-85 scale-105";
+                    prodTitle.innerText = "⭐ GOLD RARE SIGNAL! ⭐";
+                } else {
+                    prodFlagIcon.className = "fa-solid fa-flag text-red-500 text-8xl animate-pulse";
+                    prodTitle.innerText = "RED CHANCE FLAG!";
+                }
+
+                pullButton.classList.remove('hidden');
+            }, 1500);
+
+            if (pullButtonListener) {
+                pullButton.removeEventListener('click', pullButtonListener);
+            }
+
+            pullButtonListener = () => {
+                overlay.classList.add('hidden');
+                showGashaResult(scoutResults);
+            };
+            pullButton.addEventListener('click', pullButtonListener);
+        }
+
+        function showGashaResult(results) {
+            const modal = document.getElementById('gasha-result-modal');
+            const grid = document.getElementById('gasha-result-grid');
+            grid.innerHTML = ''; 
+
+            let playedExtremeFanfare = false;
+
+            results.forEach(key => {
+                const char = CHARACTERS[key];
+                const card = document.createElement('div');
+                
+                let isAlreadyUnlocked = unlockedCharacters[key];
+                unlockedCharacters[key] = true; 
+
+                const isExtreme = char.isExtreme;
+                if (isExtreme && !playedExtremeFanfare) {
+                    audio.playSFX('gasha_extreme');
+                    playedExtremeFanfare = true;
+                }
+
+                card.className = `bg-slate-950 p-4 rounded-xl border flex flex-col items-center justify-between text-center relative overflow-hidden ${
+                    isExtreme ? 'ext-rainbow border-4' : 'border-purple-500/40'
+                }`;
+
+                let extremeBanner = isExtreme ? `
+                    <div class="absolute top-0 bg-gradient-to-r from-red-500 via-yellow-500 to-pink-500 text-slate-950 text-[7px] font-black w-full py-0.5 uppercase tracking-widest font-sans">
+                        EXTREME
+                    </div>
+                ` : '';
+
+                let charBadge = isExtreme ? 'bg-gradient-to-r from-yellow-400 to-amber-500' : 'bg-slate-800';
+
+                card.innerHTML = `
+                    ${extremeBanner}
+                    <div class="w-16 h-16 rounded-full ${charBadge} p-1 mb-2 mt-2 flex items-center justify-center">
+                        <div class="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-slate-900 border">
+                            ${char.svg}
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="font-extrabold text-sm text-white">${char.name}</h4>
+                        <p class="text-[9px] text-amber-500 font-bold uppercase tracking-wider mt-1 font-sans">${char.role.toUpperCase()}</p>
+                    </div>
+                    <div class="mt-3 text-[10px] font-black px-2.5 py-0.5 rounded-full font-sans ${
+                        !isAlreadyUnlocked ? 'bg-emerald-500 text-slate-950 animate-pulse' : 'bg-slate-800 text-gray-400'
+                    }">
+                        ${!isAlreadyUnlocked ? 'NEW GET!' : 'DUPLICATE'}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            modal.classList.remove('hidden');
+        }
+
+        document.getElementById('btn-close-gasha-result').addEventListener('click', () => {
+            document.getElementById('gasha-result-modal').classList.add('hidden');
+        });
+    </script>
+
+    <!-- ゲームマネージャー -->
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const minimapCanvas = document.getElementById('minimapCanvas');
+        const minimapCtx = minimapCanvas.getContext('2d');
+
+        let player = null;
+        const entities = [];
+        const flags = [];
+
+        let shakeAmount = 0;
+        window.addEventListener('screenshake', (e) => {
+            shakeAmount = Number(e.detail.amt) || 0;
+        });
+
+        const camera = { x: 0, y: 0 };
+        let matchDuration = 120 * 60; 
+        let matchActive = false;
+
+        let playerKOs = 0;
+        let playerCaptures = 0;
+        let recoverySpawnTimer = 0;
+
+        function resizeCanvas() {
+            const w = window.innerWidth > 0 ? window.innerWidth : 800;
+            const h = window.innerHeight > 0 ? window.innerHeight : 600;
+            canvas.width = w;
+            canvas.height = h;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // メインメニュー ➔ キャラ選択画面
+        document.getElementById('btn-to-char-select').addEventListener('click', () => {
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('char-screen').classList.remove('hidden');
+            renderCharacterList();
+        });
+
+        document.getElementById('btn-back-to-menu-from-char').addEventListener('click', () => {
+            document.getElementById('char-screen').classList.add('hidden');
+            document.getElementById('menu-screen').classList.remove('hidden');
+            updateDiamondsDisplay();
+        });
+
+        // キャラクター選択画面（WANTEDボード）を動的レンダリング
+        function renderCharacterList() {
+            const grid = document.getElementById('character-list-grid');
+            grid.innerHTML = '';
+
+            for (const key in CHARACTERS) {
+                const char = CHARACTERS[key];
+                const isUnlocked = unlockedCharacters[key];
+
+                const card = document.createElement('div');
+                card.className = `wanted-card bg-amber-950/20 border-2 rounded-xl p-3.5 flex flex-col justify-between ${
+                    isUnlocked ? 'border-amber-700/50 hover:border-amber-500 cursor-pointer' : 'border-slate-800 opacity-60'
+                } ${char.isExtreme ? 'ext-rainbow' : ''}`;
+
+                if (isUnlocked) {
+                    card.onclick = () => selectCharacter(key);
+                }
+
+                let lockOverlay = !isUnlocked ? `
+                    <div class="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-3 text-center">
+                        <i class="fa-solid fa-lock text-purple-400 text-3xl mb-1.5"></i>
+                        <span class="text-xs text-white font-extrabold font-sans">ダイヤガシャで獲得しよう！</span>
+                    </div>
+                ` : '';
+
+                card.innerHTML = `
+                    <div class="relative bg-slate-900 aspect-[3/4] rounded-lg mb-3 flex items-center justify-center overflow-hidden border border-amber-900/40">
+                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent z-10"></div>
+                        <div class="w-full h-full flex items-center justify-center p-4">
+                            ${char.svg}
+                        </div>
+                        <div class="absolute bottom-2 left-2 z-20 flex space-x-1 font-sans">
+                            <span class="bg-emerald-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">${char.role.toUpperCase()}</span>
+                            ${char.isExtreme ? '<span class="bg-gradient-to-r from-red-500 to-pink-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase">超フェス</span>' : ''}
+                        </div>
+                        ${lockOverlay}
+                    </div>
+                    <div>
+                        <h3 class="font-black text-xl tracking-wide text-amber-500 truncate">${char.name}</h3>
+                        <p class="text-[11px] text-gray-400 mb-2 leading-tight">${char.title}</p>
+                        <div class="grid grid-cols-2 gap-1 text-[10px]">
+                            <div class="bg-slate-900 p-1 rounded border border-slate-800 text-center"><span class="text-amber-500 font-bold">S1</span><br>${char.skills.skill1.name.substring(0,6)}</div>
+                            <div class="bg-slate-900 p-1 rounded border border-slate-800 text-center"><span class="text-amber-500 font-bold">S2</span><br>${char.skills.skill2.name.substring(0,6)}</div>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            }
+            updateDiamondsDisplay();
+        }
+
+        function selectCharacter(charId) {
+            document.getElementById('char-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            setupMatch(charId);
+        }
+
+        function setupMatch(playerCharId) {
+            entities.length = 0;
+            flags.length = 0;
+            playerKOs = 0;
+            playerCaptures = 0;
+            matchDuration = 120 * 60;
+
+            blueBoostGauge = 0;
+            redBoostGauge = 0;
+            blueBoostTimer = 0;
+            redBoostTimer = 0;
+            document.getElementById('blue-boost-bar').style.width = '0%';
+            document.getElementById('red-boost-bar').style.width = '0%';
+            document.getElementById('blue-boost-text').innerText = '0%';
+            document.getElementById('red-boost-text').innerText = '0%';
+            document.getElementById('boost-overlay').className = "absolute inset-0 pointer-events-none z-35 transition-all duration-300";
+
+            updateLiveStats();
+            generateObstacles();
+
+            const stagesKeys = Object.keys(STAGES);
+            activeStage = STAGES[stagesKeys[Math.floor(Math.random() * stagesKeys.length)]];
+            document.getElementById('current-stage-name').innerText = activeStage.themeName;
+
+            stageGimmicks.length = 0;
+            recoveryItems.length = 0;
+
+            if (activeStage === STAGES.sabaody) {
+                stageGimmicks.push(new StageGimmick('bubble', 450, 450));
+                stageGimmicks.push(new StageGimmick('bounce_bubble', WORLD_SIZE - 450, WORLD_SIZE - 450));
+            } else if (activeStage === STAGES.alabasta) {
+                stageGimmicks.push(new StageGimmick('quicksand', WORLD_SIZE / 2 - 150, WORLD_SIZE / 2 + 150));
+                stageGimmicks.push(new StageGimmick('wind', WORLD_SIZE / 2 + 150, WORLD_SIZE / 2 - 150));
+            } else if (activeStage === STAGES.marineford) {
+                stageGimmicks.push(new StageGimmick('ice', WORLD_SIZE / 2, WORLD_SIZE / 3));
+                stageGimmicks.push(new StageGimmick('ice', WORLD_SIZE / 2, WORLD_SIZE * 0.7));
+            }
+
+            minimapCanvas.width = 128;
+            minimapCanvas.height = 128;
+
+            player = new GameEntity(playerCharId, 'blue', 150, WORLD_SIZE / 2, true);
+            entities.push(player);
+
+            document.getElementById('hud-player-avatar').innerHTML = CHARACTERS[playerCharId].svg;
+            document.getElementById('hud-player-name').innerText = player.name;
+            document.getElementById('hud-player-role').innerText = player.role.toUpperCase();
+
+            document.getElementById('btn-skill1-name').innerText = player.skills.skill1.name.substring(0, 8);
+            document.getElementById('btn-skill2-name').innerText = player.skills.skill2.name.substring(0, 8);
+            
+            document.getElementById('btn-skill1-icon').className = player.skills.skill1.icon + ' text-lg';
+            document.getElementById('btn-skill2-icon').className = player.skills.skill2.icon + ' text-lg';
+
+            // 解放している or 初期プールから選ばれた味方CPU
+            const availableAllys = Object.keys(CHARACTERS).filter(k => k !== playerCharId);
+            const ally1 = new GameEntity(availableAllys[0] || 'luffy', 'blue', 150, WORLD_SIZE / 2 - 140);
+            const ally2 = new GameEntity(availableAllys[1] || 'zoro', 'blue', 150, WORLD_SIZE / 2 + 140);
+            const ally3 = new GameEntity(availableAllys[2] || 'kaido', 'blue', 220, WORLD_SIZE / 2); 
+            entities.push(ally1, ally2, ally3);
+
+            // 敵アリーナCPUプール
+            const enemyPool = ['shanks', 'kaido', 'zoro', 'law', 'yamato', 'gear5', 'roger', 'teach'];
+            enemyPool.sort(() => Math.random() - 0.5);
+
+            for (let i = 0; i < 4; i++) {
+                const enemyKey = enemyPool[i % enemyPool.length];
+                const enemy = new GameEntity(
+                    enemyKey,
+                    'red',
+                    WORLD_SIZE - 150 - Math.random() * 50,
+                    WORLD_SIZE / 2 + (i - 1.5) * 160
+                );
+                // CPU能力ハンディキャップ調整
+                enemy.maxHp = Math.floor(enemy.maxHp * 0.75);
+                enemy.hp = enemy.maxHp;
+                enemy.attackPower = Math.floor(enemy.attackPower * 0.75);
+                enemy.defensePower = Math.floor(enemy.defensePower * 0.70);
+                enemy.speed = enemy.speed * 0.85;
+
+                entities.push(enemy);
+            }
+
+            flags.push(new Flag(1, 'A', 260, WORLD_SIZE / 2)); 
+            flags.push(new Flag(2, 'B', WORLD_SIZE * 0.4, WORLD_SIZE * 0.3)); 
+            flags.push(new Flag(3, 'C', WORLD_SIZE / 2, WORLD_SIZE / 2)); 
+            flags.push(new Flag(4, 'D', WORLD_SIZE * 0.6, WORLD_SIZE * 0.7)); 
+            flags.push(new Flag(5, 'E', WORLD_SIZE - 260, WORLD_SIZE / 2)); 
+
+            audio.startBGM();
+            matchActive = true;
+            
+            updateControlLayout();
+            setupTouchControls();
+
+            showGameNotification("バトルスタート！", "#f59e0b");
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updateLiveStats() {
+            document.getElementById('live-stat-kos').innerText = playerKOs;
+            document.getElementById('live-stat-caps').innerText = playerCaptures;
+        }
+
+        function triggerPlayerSkill(key) {
+            if (!player || player.isDead) return;
+            player.useSkill(key, entities);
+        }
+
+        function triggerPlayerDodge() {
+            if (!player || player.isDead) return;
+            player.dodge();
+        }
+
+        document.getElementById('btn-attack').addEventListener('mousedown', () => {
+            if (player) player.performMelee(entities);
+        });
+
+        document.getElementById('btn-skill1').addEventListener('click', () => triggerPlayerSkill('skill1'));
+        document.getElementById('btn-skill2').addEventListener('click', () => triggerPlayerSkill('skill2'));
+        document.getElementById('btn-dodge').addEventListener('click', triggerPlayerDodge);
+
+        function gameLoop() {
+            if (!matchActive) return;
+
+            updateGame();
+            renderGame();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updateGame() {
+            matchDuration--;
+            if (matchDuration <= 0) {
+                endMatch();
+                return;
+            }
+
+            if (shakeAmount > 0) shakeAmount *= 0.9;
+
+            if (blueBoostTimer > 0) {
+                blueBoostTimer--;
+                if (blueBoostTimer === 0) {
+                    document.getElementById('boost-overlay').className = "absolute inset-0 pointer-events-none z-35 transition-all duration-300";
+                }
+            }
+            if (redBoostTimer > 0) {
+                redBoostTimer--;
+                if (redBoostTimer === 0) {
+                    document.getElementById('boost-overlay').className = "absolute inset-0 pointer-events-none z-35 transition-all duration-300";
+                }
+            }
+
+            let blueOwned = 0;
+            let redOwned = 0;
+            for (const f of flags) {
+                if (f.team === 'blue') blueOwned++;
+                if (f.team === 'red') redOwned++;
+            }
+            if (blueOwned > 0) accumulateBoost('blue', blueOwned * 0.015);
+            if (redOwned > 0) accumulateBoost('red', redOwned * 0.015);
+
+            if (player && !player.isDead && player.stunTimer <= 0) {
+                let dx = 0;
+                let dy = 0;
+
+                if (keys['w'] || keys['arrowup']) dy -= 1;
+                if (keys['s'] || keys['arrowdown']) dy += 1;
+                if (keys['a'] || keys['arrowleft']) dx -= 1;
+                if (keys['d'] || keys['arrowright']) dx += 1;
+
+                if (joystickActive) {
+                    dx = joystickCurrent.x;
+                    dy = joystickCurrent.y;
+                }
+
+                if (dx !== 0 || dy !== 0) {
+                    const angle = Math.atan2(dy, dx);
+                    player.angle = angle;
+                    
+                    let currentSpeed = player.speed;
+                    if (blueBoostTimer > 0) currentSpeed *= 1.3;
+                    if (player.speedBoostTimer > 0) currentSpeed *= 1.5;
+
+                    player.vx += Math.cos(angle) * currentSpeed * 0.16;
+                    player.vy += Math.sin(angle) * currentSpeed * 0.16;
+
+                    if (Math.random() < 0.16) {
+                        effects.spawnDust(player.x, player.y, activeStage.boundaryColor);
+                    }
+                }
+
+                if (keys[' ']) {
+                    player.performMelee(entities);
+                }
+            }
+
+            recoverySpawnTimer--;
+            if (recoverySpawnTimer <= 0 && recoveryItems.length < 4) {
+                recoverySpawnTimer = 720; 
+                const rx = 200 + Math.random() * (WORLD_SIZE - 400);
+                const ry = 200 + Math.random() * (WORLD_SIZE - 400);
+                recoveryItems.push(new RecoveryItem(rx, ry));
+            }
+
+            for (const entity of entities) {
+                entity.update(entities, flags);
+            }
+
+            for (const f of flags) {
+                f.update(entities);
+            }
+
+            for (let i = recoveryItems.length - 1; i >= 0; i--) {
+                const item = recoveryItems[i];
+                item.update(entities);
+                if (item.isConsumed) {
+                    recoveryItems.splice(i, 1);
+                }
+            }
+
+            for (const gimmick of stageGimmicks) {
+                gimmick.update(entities);
+            }
+
+            effects.update();
+
+            if (blueOwned === 5) {
+                endMatch('victory', 'パーフェクトお宝奪取！ (5-0 勝利)');
+                return;
+            } else if (redOwned === 5) {
+                endMatch('defeat', '敵チームのパーフェクト奪取...');
+                return;
+            }
+
+            document.getElementById('blue-score-badge').innerText = blueOwned;
+            document.getElementById('red-score-badge').innerText = redOwned;
+            document.getElementById('blue-flag-count').innerText = `${blueOwned} / 5`;
+            document.getElementById('red-flag-count').innerText = `${redOwned} / 5`;
+
+            const blueRatio = (blueOwned / 5) * 100;
+            document.getElementById('blue-bar').style.width = `${blueRatio}%`;
+            document.getElementById('red-bar').style.width = `${100 - blueRatio}%`;
+
+            if (player) {
+                const ratio = player.hp / player.maxHp;
+                document.getElementById('hud-player-hp').style.width = `${ratio * 100}%`;
+                document.getElementById('hud-player-hp-text').innerText = `${player.hp} / ${player.maxHp}`;
+
+                updateCooldownOverlay('skill1', player.skill1Cooldown);
+                updateCooldownOverlay('skill2', player.skill2Cooldown);
+                updateCooldownOverlay('dodge', player.dodgeCooldown);
+            }
+
+            const totalSec = Math.floor(matchDuration / 60);
+            const m = Math.floor(totalSec / 60).toString().padStart(2, '0');
+            const s = (totalSec % 60).toString().padStart(2, '0');
+            document.getElementById('game-timer').innerText = `${m}:${s}`;
+        }
+
+        function updateCooldownOverlay(id, frames) {
+            const overlay = document.getElementById(`${id}-cooldown-overlay`);
+            if (frames > 0) {
+                overlay.classList.remove('hidden');
+                overlay.innerText = `${Math.ceil(frames / 60)}s`;
+            } else {
+                overlay.classList.add('hidden');
+            }
+        }
+    </script>
+
+    <!-- 描画レンダリングエンジン -->
+    <script>
+        function renderGame() {
+            if (player) {
+                let targetCamX = player.x - canvas.width / 2;
+                let targetCamY = player.y - canvas.height / 2;
+
+                camera.x = Math.max(0, Math.min(targetCamX, WORLD_SIZE - canvas.width));
+                camera.y = Math.max(0, Math.min(targetCamY, WORLD_SIZE - canvas.height));
+
+                if (isNaN(camera.x)) camera.x = 0;
+                if (isNaN(camera.y)) camera.y = 0;
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            if (shakeAmount > 0) {
+                const sx = (Math.random() - 0.5) * shakeAmount;
+                const sy = (Math.random() - 0.5) * shakeAmount;
+                ctx.translate(sx, sy);
+            }
+
+            ctx.fillStyle = activeStage.bgColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = activeStage.gridColor;
+            ctx.lineWidth = 1.5;
+            const gridSpacing = 120;
+            const startX = Math.floor(camera.x / gridSpacing) * gridSpacing;
+            const startY = Math.floor(camera.y / gridSpacing) * gridSpacing;
+
+            for (let x = startX; x < camera.x + canvas.width; x += gridSpacing) {
+                ctx.beginPath();
+                ctx.moveTo(x - camera.x, 0);
+                ctx.lineTo(x - camera.x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = startY; y < camera.y + canvas.height; y += gridSpacing) {
+                ctx.beginPath();
+                ctx.moveTo(0, y - camera.y);
+                ctx.lineTo(canvas.width, y - camera.y);
+                ctx.stroke();
+            }
+
+            ctx.strokeStyle = activeStage.boundaryColor;
+            ctx.lineWidth = 10;
+            ctx.strokeRect(-camera.x, -camera.y, WORLD_SIZE, WORLD_SIZE);
+
+            for (const obs of OBSTACLES) {
+                const rx = obs.x - camera.x;
+                const ry = obs.y - camera.y;
+
+                if (rx + obs.w > 0 && rx < canvas.width && ry + obs.h > 0 && ry < canvas.height) {
+                    ctx.save();
+                    const grad = ctx.createLinearGradient(rx, ry, rx + obs.w, ry + obs.h);
+                    grad.addColorStop(0, activeStage.obstacleColor1);
+                    grad.addColorStop(1, activeStage.obstacleColor2);
+                    ctx.fillStyle = grad;
+                    ctx.strokeStyle = activeStage.obstacleStroke;
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.roundRect(rx, ry, obs.w, obs.h, 12);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+
+            for (const gimmick of stageGimmicks) {
+                gimmick.draw(ctx, camera);
+            }
+
+            for (const f of flags) {
+                f.draw(ctx, camera);
+            }
+
+            for (const item of recoveryItems) {
+                item.draw(ctx, camera);
+            }
+
+            const sortedEntities = [...entities].sort((a, b) => a.y - b.y);
+            for (const e of sortedEntities) {
+                e.draw(ctx, camera);
+            }
+
+            effects.draw(ctx, camera);
+            effects.drawUI(ctx, camera);
+
+            ctx.restore();
+
+            if (player && !player.isDead) {
+                ctx.save();
+                for (const f of flags) {
+                    const screenX = f.x - camera.x;
+                    const screenY = f.y - camera.y;
+
+                    const margin = 55;
+                    const isOffscreen = screenX < margin || screenX > canvas.width - margin || 
+                                       screenY < margin || screenY > canvas.height - margin;
+
+                    if (isOffscreen) {
+                        const dx = f.x - player.x;
+                        const dy = f.y - player.y;
+                        const angle = Math.atan2(dy, dx);
+                        const distance = Math.floor(Math.hypot(dx, dy));
+
+                        let arrowX = canvas.width / 2 + (canvas.width / 2 - margin) * Math.cos(angle);
+                        let arrowY = canvas.height / 2 + (canvas.height / 2 - margin) * Math.sin(angle);
+
+                        ctx.translate(arrowX, arrowY);
+                        ctx.rotate(angle);
+
+                        ctx.beginPath();
+                        ctx.moveTo(12, 0);
+                        ctx.lineTo(-8, -10);
+                        ctx.lineTo(-3, 0);
+                        ctx.lineTo(-8, 10);
+                        ctx.closePath();
+
+                        let teamColor = '#facc15';
+                        if (f.team === 'blue') teamColor = '#3b82f6';
+                        else if (f.team === 'red') teamColor = '#ef4444';
+
+                        ctx.fillStyle = teamColor;
+                        ctx.shadowColor = teamColor;
+                        ctx.shadowBlur = 8;
+                        ctx.fill();
+
+                        ctx.rotate(-angle);
+
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = "900 11px 'Inter', sans-serif";
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.shadowBlur = 4;
+                        ctx.shadowColor = '#000000';
+                        ctx.fillText(`${f.name} (${distance}m)`, 0, -22);
+
+                        ctx.translate(-arrowX, -arrowY);
+                    }
+                }
+                ctx.restore();
+            }
+
+            drawMinimap(minimapCtx, entities, flags);
+        }
+    </script>
+
+    <!-- UI演出トリガー -->
+    <script>
+        function addKillLog(attackerName, victimName, isAllyKill) {
+            const container = document.getElementById('kill-log-container');
+            if (!container) return;
+
+            const log = document.createElement('div');
+            log.className = `px-3 py-1.5 rounded-lg bg-slate-950/90 border text-[11px] font-black tracking-wide shadow-lg transform transition-all duration-300 translate-x-[-30px] opacity-0 flex items-center space-x-1.5 font-sans ${
+                isAllyKill ? 'border-blue-500 text-blue-400' : 'border-red-500 text-red-400'
+            }`;
+
+            const icon = isAllyKill ? '<i class="fa-solid fa-skull text-blue-500 animate-pulse"></i>' : '<i class="fa-solid fa-skull text-red-500 animate-pulse"></i>';
+            log.innerHTML = `${icon} <span>${attackerName}</span> <span class="text-gray-400 font-medium">➔</span> <span>${victimName}</span>`;
+
+            container.appendChild(log);
+
+            requestAnimationFrame(() => {
+                log.classList.remove('translate-x-[-30px]', 'opacity-0');
+                log.classList.add('translate-x-0', 'opacity-100');
+            });
+
+            setTimeout(() => {
+                log.classList.remove('translate-x-0', 'opacity-100');
+                log.classList.add('translate-x-[-30px]', 'opacity-0');
+                setTimeout(() => {
+                    log.remove();
+                }, 300);
+            }, 3500);
+        }
+
+        function showGameNotification(text, color) {
+            const container = document.getElementById('game-notify');
+            const inner = document.getElementById('game-notify-text');
+
+            inner.innerText = text;
+            inner.style.color = color;
+            inner.style.borderColor = color;
+
+            container.classList.remove('scale-0');
+            container.classList.add('scale-100');
+
+            setTimeout(() => {
+                container.classList.remove('scale-100');
+                container.classList.add('scale-0');
+            }, 2500);
+        }
+
+        function showSkillCutIn(charName, skillName) {
+            const announcer = document.getElementById('skill-announcer');
+            const ac = document.getElementById('skill-announcer-char');
+            const an = document.getElementById('skill-announcer-name');
+
+            ac.innerText = charName.toUpperCase();
+            an.innerText = skillName;
+
+            announcer.classList.remove('scale-0');
+            announcer.classList.add('scale-100');
+
+            setTimeout(() => {
+                announcer.classList.remove('scale-100');
+                announcer.classList.add('scale-0');
+            }, 1800);
+        }
+
+        function endMatch(immediateResult = null, customSubtitle = null) {
+            matchActive = false;
+            audio.stopBGM();
+
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('result-screen').classList.remove('hidden');
+
+            let blueCount = 0;
+            let redCount = 0;
+            for (const f of flags) {
+                if (f.team === 'blue') blueCount++;
+                if (f.team === 'red') redCount++;
+            }
+
+            const isVictory = (immediateResult === 'victory') || (blueCount > redCount);
+
+            const rTitle = document.getElementById('result-title');
+            const rSub = document.getElementById('result-subtitle');
+            
+            // ダイヤの獲得ロジック
+            let diamondsEarned = isVictory ? 15 : 5;
+            diamondsEarned += playerKOs * 2;
+            diamondsEarned += playerCaptures * 3;
+
+            playerDiamonds += diamondsEarned;
+
+            document.getElementById('stat-diamonds-earned').innerText = `+${diamondsEarned}`;
+
+            if (isVictory) {
+                rTitle.innerText = "VICTORY";
+                rTitle.className = "cinzel text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-400 to-yellow-300 glow-gold animate-bounce";
+                rSub.innerText = customSubtitle || `お宝獲得エリア数で勝利！ (${blueCount} - ${redCount})`;
+                audio.playSFX('victory');
+            } else {
+                rTitle.innerText = "DEFEAT";
+                rTitle.className = "cinzel text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-rose-500 to-red-600 glow-red";
+                rSub.innerText = customSubtitle || `お宝獲得エリア数で敗北... (${blueCount} - ${redCount})`;
+                audio.playSFX('defeat');
+            }
+
+            const finalScore = (blueCount * 1200) + (playerKOs * 600) + (playerCaptures * 800) + (isVictory ? 2000 : 300);
+            document.getElementById('stat-score').innerText = finalScore.toLocaleString();
+            document.getElementById('stat-kos').innerText = playerKOs;
+            document.getElementById('stat-caps').innerText = playerCaptures;
+
+            const bountyAddition = (finalScore * 13500);
+            document.getElementById('stat-bounty').innerText = `฿ ${bountyAddition.toLocaleString()}`;
+        }
+
+        // 画面遷移イベントハンドラ
+        document.getElementById('btn-enable-audio').addEventListener('click', () => {
+            audio.init();
+            document.getElementById('audio-modal').classList.add('hidden');
+            document.getElementById('menu-screen').classList.remove('hidden');
+            updateDiamondsDisplay();
+        });
+
+        document.getElementById('btn-play-again').addEventListener('click', () => {
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('char-screen').classList.remove('hidden');
+            renderCharacterList();
+        });
+
+        document.getElementById('btn-exit-to-menu').addEventListener('click', () => {
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('menu-screen').classList.remove('hidden');
+            updateDiamondsDisplay();
+        });
+
+        function toggleHowTo(show) {
+            const dial = document.getElementById('howto-dialog');
+            if (show) dial.classList.remove('hidden');
+            else dial.classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
